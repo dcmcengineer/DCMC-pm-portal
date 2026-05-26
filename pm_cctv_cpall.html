@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Check Sheet การบำรุงรักษาเครื่องจักร/อุปกรณ์ - CP ALL</title>
+  
+  <!-- Tailwind CSS for Beautiful Styling -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- React and Babel CDN to run JSX directly in browser -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    /* ซ่อน scrollbar สำเร็จรูปสำหรับส่วนแสดงผลกล้องเพื่อให้แอปดูคลีนแบบ Mobile App */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+<body class="bg-slate-50">
+
+  <!-- Root element for React App -->
+  <div id="root"></div>
+
+  <!-- React Code with Babel translation -->
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    // รายชื่อกล้องเริ่มต้นตามที่ระบุมาทั้งหมด
+    const defaultCameraNames = [
+      "IS-15 ซอย15", "IS-16 ซอย16", "IS-21 ซอย21", "IS-36 ซอย36", "IS-33 ซอย33",
+      "IS-39 ซอย39", "IS-42 ซอย42", "IS-45 ซอย45", "IS-48 ซอย48", "IS-46 Track Way",
+      "IS-51 Track Way", "IS-54 ซอย54", "IS-57 ซอย57", "IS-60 ซอย60", "IS-63 ซอย63",
+      "IS-66 ซอย66", "IS-69 ซอย69", "IS-72 ซอย72", "IS-75 ซอย75", "IS-78 ซอย78",
+      "IS-81 ซอย81", "IS-84 ซอย84", "IS-87 ซอย87", "IS-90 ซอย90", "IS-96 ซอย96",
+      "TN-01 อุโมงค์กลางซอย87", "TN-02 อุโมงค์กลางซอย13",
+      "BC-01 B/Cชั้น3", "BC-02 B/Cชั้น3", "BC-03 B/Cชั้น3",
+      "LD-01 โหลดประตู1", "LD-02 ลานโหลด", "LD-03 ลานโหลด", "LD-04 ลานโหลด", "LD-05 ลานโหลด",
+      "DC-01 ลานรับ", "DC-02 ลานรับ", "DE-01 Pallet Flow", "DE-02 รับคืนสินค้า",
+      "OF-01 ออฟฟิศชั้น2",
+      "OS-01 ลานจอดมอเตอร์ไซค์", "OS-02 ลานจอดมอเตอร์ไซค์", "OS-03 โรงอาหารSUP.",
+      "OS-04 ลานจอดข้างโรงอาหาร", "OS-05 ลานจอดข้างโรงอาหาร", "OS-06 ลานจอดรถเทเลอร์",
+      "OS-07 ลานจอดรถยนต์พนักงาน", "OS-08 ลานจอดรถยนต์พนักงาน", "OS-09 ลานจอดรถยนต์พนักงาน",
+      "OS-10 ลานจอดมอเตอร์ไซค์CDC",
+      "SCAN 01", "SCAN 02", "GUARD 01", "GUARD 02", "GUARD 03", "GUARD 04",
+      "รับลัง ป.6", "โรงอาหารชั้น 2", "โรงอาหาร ชั้น 2", "ประตู 30",
+      // ประตูโหลด LD-01 ถึง ประตูโหลด LD-30 (30 ตัว)
+      ...Array.from({ length: 30 }, (_, i) => `ประตูโหลด LD-${String(i + 1).padStart(2, '0')}`),
+      // ประตูรับสินค้า RE-31 ถึง ประตูรับสินค้า RE-48 (18 ตัว)
+      ...Array.from({ length: 18 }, (_, i) => `ประตูรับสินค้า RE-${i + 31}`),
+      "STLD-01 ลานโหลด", "STLD-02 ลานโหลด", "STLD-03 ลานโหลด",
+      "STRE-01 ลานรับสินค้า", "STRE-02 ลานรับสินค้า", "STRE-03 ลานรับสินค้า",
+      "ประตูรับคืน TSP-IN-01", "ประตูรับคืน TSP-IN-02", "ประตูรับคืน TSP-IN-03",
+      "ประตูรับคืน TSP-IN-04", "ประตูรับคืน TSP-IN-05", "ประตูรับคืน TSP-IN-06",
+      "PICK PACK-01", "PICK PACK-02", "PICK PACK-03", "PICK PACK-04"
+    ];
+
+    const initialCameraState = defaultCameraNames.map((name, index) => ({
+      id: index + 1,
+      name: name,
+      display: 'ปกติ',
+      record: 'ปกติ'
+    }));
+
+    function App() {
+      // --- วาง URL ที่ได้จาก Google Apps Script ของคุณที่นี่ ---
+      const GOOGLE_WEB_APP_URL = "https://script.google.com/macros/s/AKfycby0O0IPWFXiDwTJpgkFnGFwOrDIueJzbdtR1H2WDCXUrvYBpFB8cydcjNldKL3ezq2MwA/exec";
+      
+      const assignerList = ["เกรียงศักดิ์", "ณรงค์", "รัฐชานนท์"];
+      const operatorList = ["ณรงค์", "รัฐชานนท์", "บัญชา", "วสุพล", "ศรายุทธ", "พิพัฒน์", "ศรราม เอี่ยมอาจ", "วงศธร", "เกรียงศักดิ์"];
+
+      // --- State จัดการข้อมูลแบบฟอร์ม ---
+      const [formData, setFormData] = useState({
+        assigner: "เกรียงศักดิ์",
+        operator1: "",
+        operator2: "",
+        operator3: "",
+        operator4: "",
+        pmDate: new Date().toISOString().split('T')[0], // วันปัจจุบันเป็น Default
+        startTime: "",
+        endTime: "",
+        summaryText: "",
+        overallStatus: "ปกติ",
+      });
+
+      // จัดการกับข้อมูลกล้อง
+      const [cameras, setCameras] = useState(() => {
+        // ลองโหลดประวัติรายชื่อกล้องล่าสุดจาก LocalStorage (ถ้าเคยแก้ไขชื่อกล้องบนเครื่องนี้ไว้)
+        const saved = localStorage.getItem("pm_cctv_cameras");
+        return saved ? JSON.parse(saved) : initialCameraState;
+      });
+
+      const [isSubmitting, setIsSubmitting] = useState(false);
+      const [submitStatus, setSubmitStatus] = useState(null); // 'success', 'error'
+      const [customError, setCustomError] = useState("");
+      const [searchTerm, setSearchTerm] = useState("");
+
+      // --- State สำหรับ PopUp จัดการรายการกล้อง ---
+      const [isManageModalOpen, setIsManageModalOpen] = useState(false);
+      const [editableCameras, setEditableCameras] = useState([]);
+      const [newCameraName, setNewCameraName] = useState("");
+      const [syncStatus, setSyncStatus] = useState("idle");
+
+      // ฟังก์ชันจัดการอัปเดตฟอร์ม
+      const handleInputChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value }));
+      };
+
+      const handleCameraCheck = (id, field, value) => {
+        setCameras(prev => prev.map(cam => 
+          cam.id === id ? { ...cam, [field]: value } : cam
+        ));
+      };
+
+      const checkAll = (status) => {
+        setCameras(prev => prev.map(cam => ({ ...cam, display: status, record: status })));
+      };
+
+      // --- เปิดปิดหน้าต่างตั้งค่ากล้อง ---
+      const openManageModal = () => {
+        setEditableCameras(cameras.map(c => ({ ...c })));
+        setNewCameraName("");
+        setIsManageModalOpen(true);
+      };
+
+      const handleAddCamera = (e) => {
+        e.preventDefault();
+        if (!newCameraName.trim()) return;
+        
+        const nextId = editableCameras.length > 0 
+          ? Math.max(...editableCameras.map(c => c.id)) + 1 
+          : 1;
+
+        setEditableCameras([...editableCameras, {
+          id: nextId,
+          name: newCameraName.trim(),
+          display: 'ปกติ',
+          record: 'ปกติ'
+        }]);
+        setNewCameraName("");
+      };
+
+      const handleRemoveCamera = (id) => {
+        setEditableCameras(editableCameras.filter(c => c.id !== id));
+      };
+
+      const handleEditCameraName = (id, newName) => {
+        setEditableCameras(editableCameras.map(c => 
+          c.id === id ? { ...c, name: newName } : c
+        ));
+      };
+
+      const saveCameraSettings = () => {
+        setSyncStatus("saving");
+        // อัปเดต state ตัวจริงในเครื่อง
+        setCameras(editableCameras);
+        // บันทึกเก็บลงใน Browser's LocalStorage เพื่อจดจำเป็นค่า Default ในการเข้าแอปครั้งหน้า
+        localStorage.setItem("pm_cctv_cameras", JSON.stringify(editableCameras));
+        
+        setSyncStatus("saved");
+        setTimeout(() => {
+          setIsManageModalOpen(false);
+          setSyncStatus("idle");
+        }, 800);
+      };
+
+      // --- ส่งข้อมูลแบบฟอร์มบันทึกผลไปยัง Google Sheet ---
+      const handleSubmit = async (e) => {
+        e.preventDefault();
+        setCustomError("");
+        setSubmitStatus(null);
+
+        if (!GOOGLE_WEB_APP_URL || GOOGLE_WEB_APP_URL === "" || GOOGLE_WEB_APP_URL.includes("นำ_URL_ที่ได้")) {
+          setCustomError("กรุณาตรวจสอบการระบุค่า GOOGLE_WEB_APP_URL ของคุณในไฟล์นี้ก่อนครับ");
+          window.scrollTo(0, 0);
+          return;
+        }
+
+        setIsSubmitting(true);
+
+        const payload = {
+          timestamp: new Date().toLocaleString('th-TH'),
+          ...formData,
+          checklist: cameras
+        };
+
+        try {
+          const response = await fetch(GOOGLE_WEB_APP_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({ data: JSON.stringify(payload) })
+          });
+
+          const result = await response.json();
+          if (result.status === 'success') {
+            setSubmitStatus('success');
+            window.scrollTo(0, 0);
+          } else {
+            setSubmitStatus('error');
+            setCustomError(result.message || "เกิดข้อผิดพลาดในการบันทึกที่ฝั่ง Google Sheet");
+          }
+        } catch (error) {
+          console.error("Submit Error:", error);
+          setSubmitStatus('error');
+          setCustomError("ไม่สามารถเชื่อมต่อ Google Web App ได้ กรุณาเช็คอินเทอร์เน็ต และตรวจสอบการอัปโหลดไฟล์ใน Google Script");
+        } finally {
+          setIsSubmitting(false);
+        }
+      };
+
+      const filteredCameras = cameras.filter(cam => 
+        cam.name.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+
+      return (
+        <div className="min-h-screen bg-slate-50 pb-20 font-sans text-slate-800">
+          
+          {/* Header กระดาษทางการตามสเปก CP ALL */}
+          <header className="bg-white shadow-md border-b border-green-500 border-b-4 sticky top-0 z-30">
+            <div className="p-4 max-w-md mx-auto">
+              <div className="flex items-center justify-between">
+                <span className="bg-green-600 text-white text-[10px] font-bold px-2 py-0.5 rounded">CP ALL</span>
+                <span className="text-[10px] text-slate-400 font-medium flex items-center">
+                  <i className="lucide-smartphone w-3 h-3 mr-1"></i>ระบบมือถือหน้างาน
+                </span>
+              </div>
+              <h1 className="text-md font-extrabold text-slate-900 mt-1">บริษัท ซีพีออลล์ จำกัด (มหาชน)</h1>
+              <h2 className="text-xs font-bold text-slate-600 mt-0.5 flex items-center">
+                <i className="lucide-file-text text-green-600 mr-1.5 w-3.5 h-3.5"></i>
+                Check Sheet การบำรุงรักษาเครื่องจักร/อุปกรณ์
+              </h2>
+              
+              <div className="grid grid-cols-3 gap-1 mt-2 pt-2 border-t border-slate-100 text-[10px] text-slate-500 font-semibold">
+                <div>รหัส: <span className="text-slate-800">B3-FM-10-01-06</span></div>
+                <div className="text-center">ปรับปรุงครั้งที่: <span className="text-slate-800">0</span></div>
+                <div className="text-right">ประกาศใช้: <span className="text-slate-800">1 เม.ย. 2560</span></div>
+              </div>
+            </div>
+          </header>
+
+          <div className="max-w-md mx-auto p-4 space-y-5">
+            
+            {/* กล่องสถานะการบันทึก */}
+            {submitStatus === 'success' && (
+              <div className="bg-green-100 border-2 border-green-400 text-green-800 p-4 rounded-xl flex items-start shadow-sm">
+                <i className="lucide-check-circle text-green-600 w-5 h-5 mr-2 shrink-0 mt-0.5"></i>
+                <div>
+                  <p className="font-bold text-sm">บันทึกเรียบร้อย!</p>
+                  <p className="text-xs mt-0.5 font-medium">ส่งผลการตรวจ PM เข้า Google Sheet เรียบร้อยแล้ว</p>
+                </div>
+              </div>
+            )}
+            
+            {submitStatus === 'error' && (
+              <div className="bg-red-100 border-2 border-red-400 text-red-800 p-4 rounded-xl flex items-start shadow-sm">
+                <i className="lucide-alert-circle text-red-500 w-5 h-5 mr-2 shrink-0 mt-0.5"></i>
+                <div>
+                  <p className="font-bold text-sm">การส่งข้อมูลล้มเหลว</p>
+                  <p className="text-xs mt-0.5 font-semibold">{customError}</p>
+                </div>
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-5">
+              
+              {/* ข้อมูลอุปกรณ์และสถานที่ */}
+              <section className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 space-y-4">
+                <div className="flex items-center text-green-700 font-bold border-b pb-2 text-sm">
+                  <i className="lucide-settings w-4 h-4 mr-2"></i>
+                  <span>ข้อมูลอุปกรณ์ & สถานที่</span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <span className="text-slate-400">เครื่องจักร/อุปกรณ์</span>
+                    <p className="font-bold text-slate-800 mt-1 px-3 py-2 bg-slate-50 rounded-lg border">CCTV</p>
+                  </div>
+                  <div>
+                    <span className="text-slate-400">ความถี่</span>
+                    <p className="font-bold text-slate-800 mt-1 px-3 py-2 bg-slate-50 rounded-lg border">รอบประจำเดือน</p>
+                  </div>
+                </div>
+
+                <div>
+                  <span className="text-xs text-slate-400">สถานที่</span>
+                  <p className="font-bold text-xs text-slate-800 mt-1 px-3 py-2 bg-slate-50 rounded-lg border flex items-center">
+                    <i className="lucide-map-pin text-red-500 mr-2 w-3.5 h-3.5"></i>
+                    ห้องควบคุม CCTV
+                  </p>
+                </div>
+
+                {/* วันที่ PM */}
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1 font-bold">วันที่ทำ PM</label>
+                  <div className="flex items-center border rounded-lg px-3 py-1 bg-white focus-within:ring-2 focus-within:ring-green-500">
+                    <i className="lucide-calendar text-slate-400 mr-2 w-4 h-4"></i>
+                    <input 
+                      type="date" 
+                      name="pmDate" 
+                      value={formData.pmDate} 
+                      onChange={handleInputChange} 
+                      required 
+                      className="w-full py-1 text-xs outline-none bg-transparent" 
+                    />
+                  </div>
+                </div>
+
+                {/* เวลาปฏิบัติงาน */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1 font-bold">เวลาเริ่ม</label>
+                    <div className="flex items-center border rounded-lg px-2 py-1 bg-white focus-within:ring-2 focus-within:ring-green-500">
+                      <i className="lucide-clock text-slate-400 mr-2 w-3.5 h-3.5"></i>
+                      <input 
+                        type="time" 
+                        name="startTime" 
+                        value={formData.startTime} 
+                        onChange={handleInputChange} 
+                        required 
+                        className="w-full py-1 text-xs outline-none bg-transparent" 
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1 font-bold">เวลาสิ้นสุด</label>
+                    <div className="flex items-center border rounded-lg px-2 py-1 bg-white focus-within:ring-2 focus-within:ring-green-500">
+                      <i className="lucide-clock text-slate-400 mr-2 w-3.5 h-3.5"></i>
+                      <input 
+                        type="time" 
+                        name="endTime" 
+                        value={formData.endTime} 
+                        onChange={handleInputChange} 
+                        required 
+                        className="w-full py-1 text-xs outline-none bg-transparent" 
+                      />
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* ทีมงานผู้ปฏิบัติงาน */}
+              <section className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 space-y-4">
+                <div className="flex items-center text-blue-700 font-bold border-b pb-2 text-sm">
+                  <i className="lucide-users w-4 h-4 mr-2"></i>
+                  <span>ทีมงานที่ปฏิบัติการ</span>
+                </div>
+
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1 font-bold">ผู้มอบหมายงาน</label>
+                  <input 
+                    list="assigners" 
+                    name="assigner" 
+                    value={formData.assigner} 
+                    onChange={handleInputChange} 
+                    placeholder="เลือกหรือระบุชื่อผู้มอบหมาย..."
+                    className="w-full p-2.5 text-xs border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                  <datalist id="assigners">
+                    {assignerList.map((name, idx) => <option key={idx} value={name} />)}
+                  </datalist>
+                </div>
+
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1 font-bold">ผู้ปฏิบัติงาน (ใส่ได้สูงสุด 4 คน)</label>
+                  <div className="grid grid-cols-2 gap-2 mt-1">
+                    {[1, 2, 3, 4].map(num => (
+                      <div key={num} className="flex items-center border rounded-lg px-2 bg-white focus-within:ring-2 focus-within:ring-blue-500">
+                        <i className="lucide-user text-slate-400 mr-1.5 w-3.5 h-3.5"></i>
+                        <input 
+                          list="operators" 
+                          name={`operator${num}`} 
+                          value={formData[`operator${num}`]} 
+                          onChange={handleInputChange}
+                          placeholder={`คนที่ ${num}`}
+                          className="w-full py-2 text-xs outline-none bg-transparent"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <datalist id="operators">
+                    {operatorList.map((name, idx) => <option key={idx} value={name} />)}
+                  </datalist>
+                </div>
+              </section>
+
+              {/* รายการกล้องตรวจเช็ค */}
+              <section className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 space-y-4">
+                <div className="flex items-center justify-between border-b pb-2">
+                  <div className="flex items-center text-teal-700 font-bold text-sm">
+                    <i className="lucide-camera w-4 h-4 mr-2"></i>
+                    <span>ตรวจเช็ค CCTV ({cameras.length} จุด)</span>
+                  </div>
+                  
+                  {/* ปุ่มเปลี่ยนโครงสร้างกล้องหน้างาน */}
+                  <button
+                    type="button"
+                    onClick={openManageModal}
+                    className="flex items-center text-xs text-teal-600 bg-teal-50 border border-teal-100 px-2.5 py-1 rounded-lg hover:bg-teal-100 font-bold transition-all"
+                  >
+                    <i className="lucide-settings w-3 h-3 mr-1"></i>
+                    จัดการรายการกล้อง
+                  </button>
+                </div>
+
+                {/* ตัวช่วยกรองค้นหา และเลือกพร้อมกัน */}
+                <div className="space-y-2">
+                  <div className="flex items-center border rounded-lg px-3 py-1.5 bg-slate-50 text-xs focus-within:bg-white focus-within:ring-2 focus-within:ring-teal-500">
+                    <i className="lucide-search text-slate-400 mr-2 w-4 h-4"></i>
+                    <input
+                      type="text"
+                      placeholder="ค้นหาชื่อหรือตำแหน่งกล้อง..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full bg-transparent outline-none py-0.5"
+                    />
+                    {searchTerm && (
+                      <button type="button" onClick={() => setSearchTerm("")}>
+                        <i className="lucide-x text-slate-400 hover:text-slate-600 w-4 h-4"></i>
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="flex justify-end space-x-1.5 text-[10px]">
+                    <button 
+                      type="button" 
+                      onClick={() => checkAll('ปกติ')} 
+                      className="px-2 py-1 text-green-700 bg-green-50 hover:bg-green-100 border border-green-200 rounded-md font-bold transition-all"
+                    >
+                      ปกติทั้งหมด
+                    </button>
+                    <button 
+                      type="button" 
+                      onClick={() => checkAll('ไม่ปกติ')} 
+                      className="px-2 py-1 text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 rounded-md font-bold transition-all"
+                    >
+                      ไม่ปกติทั้งหมด
+                    </button>
+                  </div>
+                </div>
+
+                {/* สกรอลรายการกล้อง */}
+                <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1 no-scrollbar pb-2">
+                  {filteredCameras.length === 0 ? (
+                    <p className="text-center text-slate-400 text-xs py-10">ไม่พบจุด CCTV ที่ตรงกับการค้นหา</p>
+                  ) : (
+                    filteredCameras.map((camera, index) => (
+                      <div key={camera.id} className="p-3 bg-slate-50 rounded-xl border border-slate-100 shadow-sm">
+                        <div className="font-bold text-xs text-slate-700 mb-2 flex items-center">
+                          <span className="bg-slate-200 text-slate-700 text-[10px] px-1.5 py-0.5 rounded mr-1.5 shrink-0">
+                            จุดที่ {index + 1}
+                          </span>
+                          <span className="truncate">{camera.name}</span>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <div className="text-[10px] text-slate-400 mb-1 text-center font-bold">การแสดงผล</div>
+                            <div className="flex space-x-1">
+                              <button
+                                type="button"
+                                onClick={() => handleCameraCheck(camera.id, 'display', 'ปกติ')}
+                                className={`flex-1 py-1.5 text-[11px] font-bold rounded-md border ${camera.display === 'ปกติ' ? 'bg-green-500 text-white border-green-600' : 'bg-white text-slate-500'}`}
+                              >
+                                ปกติ
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleCameraCheck(camera.id, 'display', 'ไม่ปกติ')}
+                                className={`flex-1 py-1.5 text-[11px] font-bold rounded-md border ${camera.display === 'ไม่ปกติ' ? 'bg-red-500 text-white border-red-600' : 'bg-white text-slate-500'}`}
+                              >
+                                ไม่ปกติ
+                              </button>
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] text-slate-400 mb-1 text-center font-bold">การบันทึกภาพ</div>
+                            <div className="flex space-x-1">
+                              <button
+                                type="button"
+                                onClick={() => handleCameraCheck(camera.id, 'record', 'ปกติ')}
+                                className={`flex-1 py-1.5 text-[11px] font-bold rounded-md border ${camera.record === 'ปกติ' ? 'bg-green-500 text-white border-green-600' : 'bg-white text-slate-500'}`}
+                              >
+                                ปกติ
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleCameraCheck(camera.id, 'record', 'ไม่ปกติ')}
+                                className={`flex-1 py-1.5 text-[11px] font-bold rounded-md border ${camera.record === 'ไม่ปกติ' ? 'bg-red-500 text-white border-red-600' : 'bg-white text-slate-500'}`}
+                              >
+                                ไม่ปกติ
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </section>
+
+              {/* บันทึกข้อความผลสรุปภาพรวม */}
+              <section className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 space-y-4">
+                <div className="flex items-center text-orange-600 font-bold border-b pb-2 text-sm">
+                  <i className="lucide-file-text w-4 h-4 mr-2"></i>
+                  <span>สรุปผลการ PM</span>
+                </div>
+
+                <div>
+                  <label className="block text-xs text-slate-500 mb-2 font-bold">สรุปผลภาพรวม</label>
+                  <div className="flex space-x-2">
+                    <button
+                      type="button"
+                      onClick={() => setFormData(p => ({ ...p, overallStatus: 'ปกติ' }))}
+                      className={`flex-1 flex items-center justify-center p-2.5 rounded-xl border font-bold text-xs transition-all ${formData.overallStatus === 'ปกติ' ? 'bg-green-500 text-white border-green-600 shadow-sm' : 'bg-white text-slate-600 border-slate-200'}`}
+                    >
+                      <i className="lucide-check-circle w-4 h-4 mr-1.5"></i> ปกติ
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData(p => ({ ...p, overallStatus: 'ไม่ปกติ' }))}
+                      className={`flex-1 flex items-center justify-center p-2.5 rounded-xl border font-bold text-xs transition-all ${formData.overallStatus === 'ไม่ปกติ' ? 'bg-red-500 text-white border-red-600 shadow-sm' : 'bg-white text-slate-600 border-slate-200'}`}
+                    >
+                      <i className="lucide-alert-circle w-4 h-4 mr-1.5"></i> ไม่ปกติ
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs text-slate-500 mb-1 font-bold">รายละเอียดเพิ่มเติม / รายการที่ต้องติดตามผล</label>
+                  <textarea 
+                    name="summaryText" 
+                    value={formData.summaryText} 
+                    onChange={handleInputChange}
+                    rows="3" 
+                    className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none text-xs"
+                    placeholder="ใส่หมายเหตุ หรือ อาการขัดข้องเพิ่มเติม..."
+                  ></textarea>
+                </div>
+              </section>
+
+              {/* ปุ่มยืนยันการส่งข้อมูล */}
+              <div className="bg-white p-3 rounded-2xl shadow-sm border border-slate-100">
+                <button 
+                  type="submit" 
+                  disabled={isSubmitting}
+                  className={`w-full py-4 rounded-xl font-bold text-sm text-white shadow-md flex justify-center items-center transition-all ${isSubmitting ? 'bg-slate-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700 active:scale-95'}`}
+                >
+                  {isSubmitting ? (
+                    <span className="flex items-center">
+                      <i className="lucide-refresh-cw animate-spin mr-2 w-4 h-4"></i>
+                      กำลังตรวจสอบและส่งรายงาน...
+                    </span>
+                  ) : (
+                    <><i className="lucide-save w-4 h-4 mr-2"></i>ยืนยันส่งข้อมูล PM เข้าระบบคลาวด์</>
+                  )}
+                </button>
+              </div>
+
+            </form>
+          </div>
+
+          {/* POPUP สำหรับการตั้งค่าลบ/เพิ่มรายชื่อกล้องแบบเรียลไทม์ */}
+          {isManageModalOpen && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+              <div className="bg-white rounded-2xl w-full max-w-md max-h-[80vh] flex flex-col shadow-2xl overflow-hidden">
+                <div className="bg-slate-100 p-4 border-b border-slate-200 flex justify-between items-center">
+                  <div>
+                    <h3 className="font-bold text-slate-800 text-xs">แก้ไขโครงสร้างกล้อง CCTV</h3>
+                    <p className="text-[9px] text-slate-500">สามารถเพิ่ม ลบ และอัปเดตชื่อกล้องเพื่อใช้หน้างาน</p>
+                  </div>
+                  <button type="button" onClick={() => setIsManageModalOpen(false)}>
+                    <i className="lucide-x text-slate-400 w-5 h-5"></i>
+                  </button>
+                </div>
+
+                <form onSubmit={handleAddCamera} className="p-3 border-b bg-slate-50 flex space-x-2">
+                  <input
+                    type="text"
+                    placeholder="ชื่อกล้อง เช่น GUARD 05..."
+                    value={newCameraName}
+                    onChange={(e) => setNewCameraName(e.target.value)}
+                    className="flex-1 px-3 py-2 text-xs border rounded-lg focus:ring-2 focus:ring-teal-500 outline-none"
+                  />
+                  <button type="submit" className="px-4 py-2 bg-teal-600 text-white text-xs font-bold rounded-lg flex items-center">
+                    <i className="lucide-plus mr-1 w-3.5 h-3.5"></i>เพิ่ม
+                  </button>
+                </form>
+
+                <div className="flex-1 overflow-y-auto p-3 space-y-2 no-scrollbar">
+                  {editableCameras.map((cam, idx) => (
+                    <div key={cam.id} className="flex items-center space-x-2 bg-slate-50 p-2 rounded-lg border">
+                      <span className="text-[10px] font-bold text-slate-400 w-6 text-center">#{idx + 1}</span>
+                      <input
+                        type="text"
+                        value={cam.name}
+                        onChange={(e) => handleEditCameraName(cam.id, e.target.value)}
+                        className="flex-1 bg-white border border-slate-200 rounded px-2 py-1 text-xs outline-none"
+                      />
+                      <button type="button" onClick={() => handleRemoveCamera(cam.id)} className="p-1 hover:text-red-500 text-slate-400">
+                        <i className="lucide-trash2 w-4 h-4"></i>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="bg-slate-100 p-3 flex justify-end space-x-2">
+                  <button type="button" onClick={() => setIsManageModalOpen(false)} className="px-3 py-2 text-xs text-slate-500 font-bold">
+                    ยกเลิก
+                  </button>
+                  <button type="button" onClick={saveCameraSettings} className="px-4 py-2 bg-green-600 text-white text-xs font-bold rounded-lg">
+                    {syncStatus === "saving" ? "กำลังบันทึก..." : "บันทึกและจดจำค่าหลัก"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+        </div>
+      );
+    }
+
+    // Render app in root
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
