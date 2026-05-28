@@ -14,7 +14,7 @@
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
   <style>
-    /* ซ่อน scrollbar สำเร็จรูปสำหรับส่วนแสดงผลเพื่อให้แอปดูคลีนเหมือน Mobile App */
+    /* ซ่อน scrollbar สำหรับส่วนแสดงผลพัดลมย่อยเพื่อให้แอปดูคลีนแบบ Mobile App */
     .no-scrollbar::-webkit-scrollbar {
       display: none;
     }
@@ -49,14 +49,25 @@
       name: name,
       status: 'ปกติ',         // ปกติ / ไม่ปกติ
       cleaning: 'ใช่',        // ใช่ / ไม่ใช่
-      current: '',           // กระแสไฟฟ้า (แอมป์)
-      voltage: '220'         // แรงดันไฟฟ้า (โวลท์) - ตั้ง default ทั่วไปไว้ที่ 220V
+      // กระแสไฟฟ้า 3 เฟส + N (แอมป์) - รองรับทศนิยม 2 ตำแหน่ง
+      current_f1: '',
+      current_f2: '',
+      current_f3: '',
+      current_fn: '0',        // ตั้งค่ากระแสเฟส N เริ่มต้นให้เป็น 0
+      // แรงดันไฟฟ้า 3 เฟส (โวลท์) - Default 380V
+      voltage_12: '380',
+      voltage_23: '380',
+      voltage_13: '380'
     }));
 
     function App() {
-      // --- วาง URL ที่ได้จาก Google Apps Script ของคุณที่นี่ ---
-      const GOOGLE_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbx-fX-UDHkUYAdAmSt766FXV9csC0PKTUQyxmf3q2eaM8yl6Oh2FJpOcyeThs8tU210fQ/exec";
-      
+      // ดึงค่า URL ของ Google Apps Script จาก LocalStorage เพื่อความสะดวกในการเปลี่ยนลิงก์ยืดหยุ่นบนโทรศัพท์
+      const [googleUrl, setGoogleUrl] = useState(() => {
+        return localStorage.getItem("pm_bigfan_sheet_url") || "";
+      });
+      const [isSettingOpen, setIsSettingOpen] = useState(false);
+      const [inputUrl, setInputUrl] = useState(googleUrl);
+
       const assignerList = ["เกรียงศักดิ์", "ณรงค์", "รัฐชานนท์"];
       const operatorList = ["ณรงค์", "รัฐชานนท์", "บัญชา", "วสุพล", "ศรายุทธ", "พิพัฒน์", "ศรราม เอี่ยมอาจ", "วงศธร", "เกรียงศักดิ์"];
 
@@ -78,7 +89,23 @@
       const [fans, setFans] = useState(() => {
         // โหลดประวัติพัดลมล่าสุดจาก LocalStorage (ถ้ามี)
         const saved = localStorage.getItem("pm_bigfan_fans");
-        return saved ? JSON.parse(saved) : initialFanState;
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          return parsed.map(fan => ({
+            id: fan.id,
+            name: fan.name,
+            status: fan.status || 'ปกติ',
+            cleaning: fan.cleaning || 'ใช่',
+            current_f1: fan.current_f1 !== undefined ? fan.current_f1 : '',
+            current_f2: fan.current_f2 !== undefined ? fan.current_f2 : '',
+            current_f3: fan.current_f3 !== undefined ? fan.current_f3 : '',
+            current_fn: fan.current_fn !== undefined ? fan.current_fn : '0', // ตั้งค่าเฟส N เริ่มต้นเป็น 0
+            voltage_12: fan.voltage_12 !== undefined ? fan.voltage_12 : '380',
+            voltage_23: fan.voltage_23 !== undefined ? fan.voltage_23 : '380',
+            voltage_13: fan.voltage_13 !== undefined ? fan.voltage_13 : '380'
+          }));
+        }
+        return initialFanState;
       });
 
       const [isSubmitting, setIsSubmitting] = useState(false);
@@ -91,6 +118,16 @@
       const [editableFans, setEditableFans] = useState([]);
       const [newFanName, setNewFanName] = useState("");
       const [syncStatus, setSyncStatus] = useState("idle");
+
+      // บันทึก URL ตัวเชื่อม Sheets ลงความจำเครื่อง
+      const handleSaveUrlSetting = (e) => {
+        e.preventDefault();
+        const trimmed = inputUrl.trim();
+        localStorage.setItem("pm_bigfan_sheet_url", trimmed);
+        setGoogleUrl(trimmed);
+        setIsSettingOpen(false);
+        alert("บันทึก URL ตัวซิงก์ข้อมูลพัดลมสำเร็จ!");
+      };
 
       // ฟังก์ชันจัดการอัปเดตฟอร์มหลัก
       const handleInputChange = (e) => {
@@ -133,8 +170,13 @@
           name: newFanName.trim(),
           status: 'ปกติ',
           cleaning: 'ใช่',
-          current: '',
-          voltage: '220'
+          current_f1: '',
+          current_f2: '',
+          current_f3: '',
+          current_fn: '0', // เฟส N เริ่มต้นเป็น 0
+          voltage_12: '380',
+          voltage_23: '380',
+          voltage_13: '380'
         }]);
         setNewFanName("");
       };
@@ -168,17 +210,53 @@
         setCustomError("");
         setSubmitStatus(null);
 
-        // ตรวจเช็คก่อนส่งว่ากรอกแอมป์ครบหรือไม่
-        const emptyCurrents = fans.filter(f => !f.current.trim());
-        if (emptyCurrents.length > 0) {
-          setCustomError(`กรุณากรอกข้อมูล "วัดกระแสไฟฟ้า (แอมป์)" ของพัดลมทุกตัวให้ครบถ้วนก่อนส่งงานครับ`);
-          window.scrollTo(0, 0);
+        // ตรวจเช็คข้อมูลเวลา
+        if (!formData.startTime || !formData.endTime) {
+          setCustomError("กรุณาระบุ 'เวลาเริ่ม' และ 'เวลาสิ้นสุด' ในการปฏิบัติงาน PM ด้วยครับ");
+          window.scrollTo({ top: 0, behavior: 'smooth' });
           return;
         }
 
-        if (!GOOGLE_WEB_APP_URL || GOOGLE_WEB_APP_URL === "" || GOOGLE_WEB_APP_URL.includes("GOOGLE_WEB_APP_URL")) {
-          setCustomError("กรุณาตรวจสอบการระบุค่า GOOGLE_WEB_APP_URL ของคุณในไฟล์นี้ก่อนครับ");
-          window.scrollTo(0, 0);
+        // ตรวจเช็คข้อมูลช่างผู้ปฏิบัติงานอย่างน้อย 1 คน
+        if (!formData.operator1 && !formData.operator2 && !formData.operator3 && !formData.operator4) {
+          setCustomError("กรุณาระบุ 'ผู้ปฏิบัติงาน' ร่วมทีมอย่างน้อย 1 ท่าน เพื่อลงบันทึกในระบบประวัติ");
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          return;
+        }
+
+        // ค้นหาตำแหน่งพัดลมที่ข้อมูลกระแสไฟฟ้าไม่ครบถ้วน
+        const incompleteCurrents = fans.filter(fanItem => 
+          fanItem.current_f1 === undefined || fanItem.current_f1 === null || fanItem.current_f1.toString().trim() === "" ||
+          fanItem.current_f2 === undefined || fanItem.current_f2 === null || fanItem.current_f2.toString().trim() === "" ||
+          fanItem.current_f3 === undefined || fanItem.current_f3 === null || fanItem.current_f3.toString().trim() === "" ||
+          fanItem.current_fn === undefined || fanItem.current_fn === null || fanItem.current_fn.toString().trim() === ""
+        );
+        
+        if (incompleteCurrents.length > 0) {
+          const names = incompleteCurrents.map(f => f.name).join(", ");
+          setCustomError(`กรุณากรอกข้อมูล "วัดกระแสไฟฟ้า (แอมป์)" ทุกเฟส (F1, F2, F3, FN) ของพัดลมเหล่านี้ให้ครบถ้วนก่อนส่งงานครับ (หากพัดลมชำรุดหรือไม่ได้เปิดใช้งานให้พิมพ์เลข 0): ${names}`);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          return;
+        }
+
+        // ค้นหาตำแหน่งพัดลมที่ข้อมูลแรงดันไฟฟ้าไม่ครบถ้วน
+        const incompleteVoltages = fans.filter(fanItem => 
+          fanItem.voltage_12 === undefined || fanItem.voltage_12 === null || fanItem.voltage_12.toString().trim() === "" ||
+          fanItem.voltage_23 === undefined || fanItem.voltage_23 === null || fanItem.voltage_23.toString().trim() === "" ||
+          fanItem.voltage_13 === undefined || fanItem.voltage_13 === null || fanItem.voltage_13.toString().trim() === ""
+        );
+        
+        if (incompleteVoltages.length > 0) {
+          const names = incompleteVoltages.map(f => f.name).join(", ");
+          setCustomError(`กรุณากรอกข้อมูล "วัดแรงดันไฟฟ้า (โวลท์)" ทุกเฟส (F1-2, F2-3, F1-3) ของพัดลมเหล่านี้ให้ครบถ้วนก่อนส่งงานครับ: ${names}`);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          return;
+        }
+
+        const trimmedUrl = googleUrl ? googleUrl.trim() : "";
+        if (!trimmedUrl || trimmedUrl === "" || trimmedUrl.includes("example/exec")) {
+          setCustomError("กรุณากดไอคอนรูปเฟือง ⚙️ ด้านขวาบนของแอปเพื่อตั้งค่าและวางลิงก์ Google Apps Script ก่อนส่งข้อมูลครั้งแรกครับ");
+          window.scrollTo({ top: 0, behavior: 'smooth' });
           return;
         }
 
@@ -191,24 +269,21 @@
         };
 
         try {
-          const response = await fetch(GOOGLE_WEB_APP_URL, {
+          // ใช้โหมด no-cors และ URLSearchParams เพื่อส่งข้อมูลข้าม Domain อย่างปลอดภัย
+          await fetch(trimmedUrl, {
             method: 'POST',
+            mode: 'no-cors',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: new URLSearchParams({ data: JSON.stringify(payload) })
           });
 
-          const result = await response.json();
-          if (result.status === 'success') {
-            setSubmitStatus('success');
-            window.scrollTo(0, 0);
-          } else {
-            setSubmitStatus('error');
-            setCustomError(result.message || "เกิดข้อผิดพลาดในการบันทึกที่ฝั่ง Google Sheet");
-          }
+          setSubmitStatus('success');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
         } catch (error) {
           console.error("Submit Error:", error);
           setSubmitStatus('error');
-          setCustomError("ไม่สามารถเชื่อมต่อ Google Web App ได้ กรุณาเช็คอินเทอร์เน็ต และตรวจสอบขั้นตอนการ Deploy ใน Google Apps Script ของท่าน");
+          setCustomError("การเชื่อมต่อฐานข้อมูลล้มเหลว กรุณาตรวจสอบอินเทอร์เน็ต และสิทธิ์การ Deploy ใน Google Apps Script");
+          window.scrollTo({ top: 0, behavior: 'smooth' });
         } finally {
           setIsSubmitting(false);
         }
@@ -226,13 +301,28 @@
             <div className="p-4 max-w-md mx-auto">
               <div className="flex items-center justify-between">
                 <span className="bg-green-600 text-white text-[10px] font-bold px-2 py-0.5 rounded">CP ALL</span>
-                <span className="text-[10px] text-slate-400 font-medium flex items-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-3.5 h-3.5 mr-1 text-slate-400">
-                    <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
-                    <line x1="12" y1="18" x2="12.01" y2="18" />
-                  </svg>
-                  ระบบมือถือหน้างาน
-                </span>
+                
+                <div className="flex items-center space-x-1.5">
+                  {/* ปุ่มตั้งค่าตัวเชื่อม Google App Script */}
+                  <button 
+                    type="button" 
+                    onClick={() => { setInputUrl(googleUrl); setIsSettingOpen(true); }}
+                    className="p-1 text-slate-500 hover:text-green-600 hover:bg-slate-100 rounded-lg transition-all"
+                    title="ตั้งค่าลิงก์เชื่อมต่อชีต"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-4 h-4">
+                      <circle cx="12" cy="12" r="3" />
+                      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                    </svg>
+                  </button>
+                  <span className="text-[10px] text-slate-400 font-medium flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-3.5 h-3.5 mr-1 text-slate-400">
+                      <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
+                      <line x1="12" y1="18" x2="12.01" y2="18" />
+                    </svg>
+                    ระบบมือถือหน้างาน
+                  </span>
+                </div>
               </div>
               <h1 className="text-md font-extrabold text-slate-900 mt-1">บริษัท ซีพีออลล์ จำกัด (มหาชน)</h1>
               <h2 className="text-xs font-bold text-slate-600 mt-0.5 flex items-center">
@@ -247,9 +337,9 @@
               </h2>
               
               <div className="grid grid-cols-3 gap-1 mt-2 pt-2 border-t border-slate-100 text-[10px] text-slate-500 font-semibold">
-                <div>รหัส: <span className="text-slate-800">B3-FM-10-01-06</span></div>
-                <div className="text-center">ปรับปรุงครั้งที่: <span className="text-slate-800">0</span></div>
-                <div className="text-right">ประกาศใช้: <span className="text-slate-800">1 เม.ย. 2560</span></div>
+                <div>รหัส: <span className="text-slate-800 font-bold">B3-FM-10-01-06</span></div>
+                <div className="text-center">ปรับปรุงครั้งที่: <span className="text-slate-800 font-bold">0</span></div>
+                <div className="text-right">ประกาศใช้: <span className="text-slate-800 font-bold">1 เม.ย. 2560</span></div>
               </div>
             </div>
           </header>
@@ -270,7 +360,7 @@
               </div>
             )}
             
-            {submitStatus === 'error' && (
+            {(submitStatus === 'error' || customError) && (
               <div className="bg-red-100 border-2 border-red-400 text-red-800 p-4 rounded-xl flex items-start shadow-sm animate-fadeIn">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-red-500 w-5 h-5 mr-2 shrink-0 mt-0.5">
                   <circle cx="12" cy="12" r="10" />
@@ -278,8 +368,8 @@
                   <line x1="12" y1="16" x2="12.01" y2="16" />
                 </svg>
                 <div>
-                  <p className="font-bold text-sm">การส่งข้อมูลล้มเหลว</p>
-                  <p className="text-xs mt-0.5 font-semibold">{customError}</p>
+                  <p className="font-bold text-sm">การกรอกข้อมูลไม่ครบถ้วน / เกิดข้อผิดพลาด</p>
+                  <p className="text-xs mt-1.5 font-bold text-red-700 bg-white/50 p-2 rounded-lg border border-red-200 leading-relaxed">{customError || "กรุณากรอกแรงดันและกระแสไฟฟ้า 3 เฟสในตารางด้านล่างให้ครบถ้วน"}</p>
                 </div>
               </div>
             )}
@@ -291,7 +381,7 @@
                 <div className="flex items-center text-green-700 font-bold border-b pb-2 text-sm">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-4 h-4 mr-2">
                     <circle cx="12" cy="12" r="3" />
-                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
                   </svg>
                   <span>ข้อมูลอุปกรณ์ & สถานที่</span>
                 </div>
@@ -334,7 +424,7 @@
                       value={formData.pmDate} 
                       onChange={handleInputChange} 
                       required 
-                      className="w-full py-1 text-xs outline-none bg-transparent" 
+                      className="w-full py-1 text-xs outline-none bg-transparent font-semibold" 
                     />
                   </div>
                 </div>
@@ -353,7 +443,6 @@
                         name="startTime" 
                         value={formData.startTime} 
                         onChange={handleInputChange} 
-                        required 
                         className="w-full py-1 text-xs outline-none bg-transparent" 
                       />
                     </div>
@@ -370,7 +459,6 @@
                         name="endTime" 
                         value={formData.endTime} 
                         onChange={handleInputChange} 
-                        required 
                         className="w-full py-1 text-xs outline-none bg-transparent" 
                       />
                     </div>
@@ -448,13 +536,13 @@
                   <button
                     type="button"
                     onClick={openManageModal}
-                    className="flex items-center text-xs text-teal-600 bg-teal-50 border border-teal-100 px-2.5 py-1 rounded-lg hover:bg-teal-100 font-bold transition-all"
+                    className="flex items-center text-xs text-teal-600 bg-teal-50 border border-teal-100 px-2.5 py-1 rounded-lg hover:bg-teal-100 font-bold transition-all animate-pulse"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-3.5 h-3.5 mr-1 text-teal-600">
                       <circle cx="12" cy="12" r="3" />
                       <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
                     </svg>
-                    จัดการรายการพัดลม ⚙️
+                    จัดการรายการพัดลม ⚙
                   </button>
                 </div>
 
@@ -467,7 +555,7 @@
                     </svg>
                     <input
                       type="text"
-                      placeholder="ค้นหาชื่อหรือตำแหน่งพนักงาน/พัดลม..."
+                      placeholder="ค้นหาชื่อพัดลม..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       className="w-full bg-transparent outline-none py-0.5"
@@ -476,7 +564,7 @@
                       <button type="button" onClick={() => setSearchTerm("")}>
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-slate-400 hover:text-slate-600 w-4 h-4">
                           <line x1="18" y1="6" x2="6" y2="18" />
-                          <line x1="6" y1="6" x2="18" y2="18" />
+                          <line x1="6" y1="6" x2="18" y2="18"/>
                         </svg>
                       </button>
                     )}
@@ -512,7 +600,7 @@
                         </div>
                         
                         {/* ตารางฟอร์มรายการกรอกค่าและสถานะ */}
-                        <div className="space-y-2">
+                        <div className="space-y-3">
                           
                           {/* 1. สถานะการทำงาน */}
                           <div className="grid grid-cols-3 gap-2 items-center">
@@ -541,53 +629,127 @@
                             <div className="col-span-2 flex space-x-1">
                               <button
                                 type="button"
-                                onClick={() => handleFanCheck(fan.id, 'cleaning', 'ใช่')}
+                                onClick={() => { handleFanCheck(fan.id, 'cleaning', 'ใช่') }}
                                 className={`flex-1 py-1.5 text-[11px] font-bold rounded-lg border ${fan.cleaning === 'ใช่' ? 'bg-indigo-500 text-white border-indigo-600' : 'bg-white text-slate-500 border-slate-200'}`}
                               >
                                 ใช่ (ทำแล้ว)
                               </button>
                               <button
                                 type="button"
-                                onClick={() => handleFanCheck(fan.id, 'cleaning', 'ไม่ใช่')}
-                                className={`flex-1 py-1.5 text-[11px] font-bold rounded-lg border ${fan.cleaning === 'ไม่ใช่' ? 'bg-amber-500 text-white border-amber-600' : 'bg-white text-slate-500 border-slate-200'}`}
+                                onClick={() => { handleFanCheck(fan.id, 'cleaning', 'ไม่ใช่') }}
+                                className={`flex-1 py-1.5 text-[11px] font-bold rounded-lg border ${fan.cleaning === 'ไม่ใช่' ? 'bg-amber-50 text-white border-amber-600' : 'bg-white text-slate-500 border-slate-200'}`}
                               >
                                 ไม่ใช่
                               </button>
                             </div>
                           </div>
 
-                          {/* 3. วัดกระแสไฟฟ้า (แอมป์) - ต้องระบุค่า */}
-                          <div className="grid grid-cols-3 gap-2 items-center">
-                            <span className="text-[11px] text-slate-500 font-bold">3. กระแสไฟฟ้า (A) *</span>
-                            <div className="col-span-2 relative">
-                              <input
-                                type="number"
-                                step="0.1"
-                                min="0"
-                                required
-                                placeholder="ต้องระบุค่ากระแส เช่น 2.4"
-                                value={fan.current}
-                                onChange={(e) => handleFanCheck(fan.id, 'current', e.target.value)}
-                                className="w-full px-3 py-1.5 text-xs border rounded-lg focus:ring-1 focus:ring-teal-500 outline-none"
-                              />
-                              <span className="absolute right-3 top-1.5 text-[10px] text-slate-400 font-bold">แอมป์ (A)</span>
+                          {/* 3. วัดกระแสไฟฟ้า 3 เฟส + N (แอมป์) */}
+                          <div className="space-y-1.5 border-t border-slate-200 pt-2">
+                            <span className="text-[11px] text-slate-500 font-bold block mb-1">3. วัดกระแสไฟฟ้า 3 เฟส (แอมป์) *</span>
+                            <div className="grid grid-cols-2 gap-2">
+                              {/* เฟส 1 */}
+                              <div className="relative">
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  placeholder="เช่น 2.45"
+                                  value={fan.current_f1}
+                                  onChange={(e) => handleFanCheck(fan.id, 'current_f1', e.target.value)}
+                                  className="w-full pl-8 pr-3 py-1.5 text-xs border rounded-lg focus:ring-1 focus:ring-teal-500 outline-none"
+                                />
+                                <span className="absolute left-2 top-1.5 text-[10px] text-slate-400 font-bold">F1:</span>
+                                <span className="absolute right-2 top-1.5 text-[9px] text-slate-300">A</span>
+                              </div>
+                              {/* เฟส 2 */}
+                              <div className="relative">
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  placeholder="เช่น 2.40"
+                                  value={fan.current_f2}
+                                  onChange={(e) => handleFanCheck(fan.id, 'current_f2', e.target.value)}
+                                  className="w-full pl-8 pr-3 py-1.5 text-xs border rounded-lg focus:ring-1 focus:ring-teal-500 outline-none"
+                                />
+                                <span className="absolute left-2 top-1.5 text-[10px] text-slate-400 font-bold">F2:</span>
+                                <span className="absolute right-2 top-1.5 text-[9px] text-slate-300">A</span>
+                              </div>
+                              {/* เฟส 3 */}
+                              <div className="relative">
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  placeholder="เช่น 2.48"
+                                  value={fan.current_f3}
+                                  onChange={(e) => handleFanCheck(fan.id, 'current_f3', e.target.value)}
+                                  className="w-full pl-8 pr-3 py-1.5 text-xs border rounded-lg focus:ring-1 focus:ring-teal-500 outline-none"
+                                />
+                                <span className="absolute left-2 top-1.5 text-[10px] text-slate-400 font-bold">F3:</span>
+                                <span className="absolute right-2 top-1.5 text-[9px] text-slate-300">A</span>
+                              </div>
+                              {/* เฟส N */}
+                              <div className="relative">
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  placeholder="เช่น 0.05"
+                                  value={fan.current_fn}
+                                  onChange={(e) => handleFanCheck(fan.id, 'current_fn', e.target.value)}
+                                  className="w-full pl-8 pr-3 py-1.5 text-xs border rounded-lg focus:ring-1 focus:ring-teal-500 outline-none"
+                                />
+                                <span className="absolute left-2 top-1.5 text-[10px] text-slate-400 font-bold">FN:</span>
+                                <span className="absolute right-2 top-1.5 text-[9px] text-slate-300">A</span>
+                              </div>
                             </div>
                           </div>
 
-                          {/* 4. วัดแรงดันไฟฟ้า (โวลท์) - ต้องระบุค่า */}
-                          <div className="grid grid-cols-3 gap-2 items-center">
-                            <span className="text-[11px] text-slate-500 font-bold">4. แรงดันไฟฟ้า (V) *</span>
-                            <div className="col-span-2 relative">
-                              <input
-                                type="number"
-                                min="0"
-                                required
-                                placeholder="ต้องระบุค่าแรงดัน เช่น 220"
-                                value={fan.voltage}
-                                onChange={(e) => handleFanCheck(fan.id, 'voltage', e.target.value)}
-                                className="w-full px-3 py-1.5 text-xs border rounded-lg focus:ring-1 focus:ring-teal-500 outline-none"
-                              />
-                              <span className="absolute right-3 top-1.5 text-[10px] text-slate-400 font-bold">โวลท์ (V)</span>
+                          {/* 4. วัดแรงดันไฟฟ้า 3 เฟส (โวลท์) */}
+                          <div className="space-y-1.5 border-t border-slate-200 pt-2">
+                            <span className="text-[11px] text-slate-500 font-bold block mb-1">4. วัดแรงดันไฟฟ้า 3 เฟส (โวลท์) *</span>
+                            <div className="grid grid-cols-3 gap-1.5">
+                              {/* เฟส 1-2 */}
+                              <div className="relative">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  placeholder="1-2"
+                                  value={fan.voltage_12}
+                                  onChange={(e) => handleFanCheck(fan.id, 'voltage_12', e.target.value)}
+                                  className="w-full pl-10 pr-2 py-1.5 text-xs border rounded-lg focus:ring-1 focus:ring-teal-500 outline-none font-semibold text-slate-700"
+                                />
+                                <span className="absolute left-1.5 top-1.5 text-[9px] text-slate-400 font-bold">F1-2:</span>
+                                <span className="absolute right-1 top-2 text-[8px] text-slate-300">V</span>
+                              </div>
+                              {/* เฟส 2-3 */}
+                              <div className="relative">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  placeholder="2-3"
+                                  value={fan.voltage_23}
+                                  onChange={(e) => handleFanCheck(fan.id, 'voltage_23', e.target.value)}
+                                  className="w-full pl-10 pr-2 py-1.5 text-xs border rounded-lg focus:ring-1 focus:ring-teal-500 outline-none font-semibold text-slate-700"
+                                />
+                                <span className="absolute left-1.5 top-1.5 text-[9px] text-slate-400 font-bold">F2-3:</span>
+                                <span className="absolute right-1 top-2 text-[8px] text-slate-300">V</span>
+                              </div>
+                              {/* เฟส 1-3 */}
+                              <div className="relative">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  placeholder="1-3"
+                                  value={fan.voltage_13}
+                                  onChange={(e) => handleFanCheck(fan.id, 'voltage_13', e.target.value)}
+                                  className="w-full pl-10 pr-2 py-1.5 text-xs border rounded-lg focus:ring-1 focus:ring-teal-500 outline-none font-semibold text-slate-700"
+                                />
+                                <span className="absolute left-1.5 top-1.5 text-[9px] text-slate-400 font-bold">F1-3:</span>
+                                <span className="absolute right-1 top-2 text-[8px] text-slate-300">V</span>
+                              </div>
                             </div>
                           </div>
 
@@ -628,7 +790,7 @@
                     <button
                       type="button"
                       onClick={() => setFormData(p => ({ ...p, overallStatus: 'ไม่ปกติ' }))}
-                      className={`flex-1 flex items-center justify-center p-2.5 rounded-xl border font-bold text-xs transition-all ${formData.overallStatus === 'ไม่ปกติ' ? 'bg-red-500 text-white border-red-600 shadow-sm' : 'bg-white text-slate-600 border-slate-200'}`}
+                      className={`flex-1 flex items-center justify-center p-2.5 rounded-xl border font-bold text-xs transition-all ${formData.overallStatus === 'ไม่ปกติ' ? 'bg-red-50 text-white border-red-600 shadow-sm' : 'bg-white text-slate-600 border-slate-200'}`}
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-4 h-4 mr-1.5">
                         <circle cx="12" cy="12" r="10" />
@@ -669,18 +831,58 @@
                       กำลังส่งรายงาน PM เข้าคลาวด์...
                     </span>
                   ) : (
-                    <><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-4 h-4 mr-2">
+                    <span className="flex items-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-4 h-4 mr-2">
                         <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
                         <polyline points="17 21 17 13 7 13 7 21" />
                         <polyline points="7 3 7 8 15 8" />
                       </svg>
-                      ยืนยันส่งข้อมูล PM เข้าระบบคลาวด์</>
+                      <span>ยืนยันส่งข้อมูล PM เข้าระบบคลาวด์</span>
+                    </span>
                   )}
                 </button>
               </div>
 
             </form>
           </div>
+
+          {/* POPUP ตั้งค่าปุ่มวางลิงก์ Google Apps Script URL */}
+          {isSettingOpen && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+              <div className="bg-white rounded-2xl w-full max-w-sm p-5 shadow-2xl space-y-4 animate-scaleIn">
+                <div className="flex justify-between items-center border-b pb-2">
+                  <h3 className="font-bold text-slate-800 text-sm">⚙️ ตั้งค่าระบบประวัติ (Apps Script Web App)</h3>
+                  <button type="button" onClick={() => setIsSettingOpen(false)}>
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-slate-400 w-5 h-5">
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </button>
+                </div>
+                
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                  นำลิงก์ Web App (ที่ได้จากขั้นตอนการ Deploy "Everyone" ใน Google Sheet ของคุณ) มาวางที่นี่เพื่อทำการซิงก์ข้อมูลตรวจเช็คพัดลม Big Fan
+                </p>
+
+                <form onSubmit={handleSaveUrlSetting} className="space-y-3">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 mb-1">Web App URL (ลงท้ายด้วย /exec)</label>
+                    <input
+                      type="url"
+                      required
+                      placeholder="https://script.google.com/macros/s/.../exec"
+                      value={inputUrl}
+                      onChange={(e) => setInputUrl(e.target.value)}
+                      className="w-full p-2 text-xs border rounded-lg focus:ring-1 focus:ring-green-500 outline-none font-mono text-slate-600"
+                    />
+                  </div>
+                  <button type="submit" className="w-full py-2.5 bg-green-600 hover:bg-green-700 text-white font-bold text-xs rounded-lg shadow">
+                    บันทึกที่อยู่เซิร์ฟเวอร์
+                  </button>
+                </form>
+              </div>
+            </div>
+          )}
 
           {/* POPUP สำหรับการตั้งค่าลบ/เพิ่มรายชื่อพัดลมในเครื่องได้เอง */}
           {isManageModalOpen && (
@@ -710,7 +912,7 @@
                   <button type="submit" className="px-4 py-2 bg-teal-600 text-white text-xs font-bold rounded-lg flex items-center">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="mr-1 w-3.5 h-3.5">
                       <line x1="12" y1="5" x2="12" y2="19" />
-                      <line x1="5" y1="12" x2="19" y2="12" />
+                      <line x1="5" y1="12" x2="19" y2="12"></line>
                     </svg>
                     เพิ่ม
                   </button>
