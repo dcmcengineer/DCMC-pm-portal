@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Check Sheet PM - Wastewater & Air Pump System</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Anuphan:wght@300;400;500;600;700&display=swap');
+    body {
+      font-family: 'Anuphan', sans-serif;
+    }
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fadeIn {
+      animation: fadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen pb-12">
+
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    // 🔴 ใส่ลิงก์ Web App ของคุณที่ได้จากการ Deploy ใน Google Apps Script หลังวางโค้ดส่วนที่ 2
+    const GOOGLE_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwSHPawdze21m3-P87gFM9d5Ms8WOoGvlQKONfli51n2vzZn4CpBcyLdAhsmcZY0psu/exec";
+
+    // ข้อมูลเริ่มต้นสำหรับกลุ่มที่ 1 Root Blower
+    const defaultRootBlowerPumps = [
+      { id: "RB-01", name: "Air Pump 01.ปั๊มเติมอากาศ ห้องน้ำล็อคเกอร์" }
+    ];
+
+    // ข้อมูลเริ่มต้นสำหรับกลุ่มที่ 2 SATO Air Pump
+    const defaultSatoPumps = [
+      { id: "SATO-02", name: "Air Pump 02. หลังห้องแบต" },
+      { id: "SATO-03-1", name: "Air Pump 03-1. ประตู48" },
+      { id: "SATO-03-2", name: "Air Pump 03-2. ประตู48" },
+      { id: "SATO-04-1", name: "Air Pump 04-1. ใต้Dockประตู30-31" },
+      { id: "SATO-04-2", name: "Air Pump 04-2. ใต้Dockประตู30-31" },
+      { id: "SATO-05-1", name: "Air Pump 05-1. office ชั้น1" },
+      { id: "SATO-05-2", name: "Air Pump 05-2. office ชั้น1" },
+      { id: "SATO-06-1", name: "Air Pump 06-1. ข้างห้องสัมภาษณ์งาน" },
+      { id: "SATO-06-2", name: "Air Pump 06-2. ข้างห้องสัมภาษณ์งาน" },
+      { id: "SATO-07", name: "Air Pump 07 หลังป้อม รปภ.1" },
+      { id: "SATO-08", name: "Air Pump 08 อาคารพักขยะ" }
+    ];
+
+    // รายการตรวจสอบมาตรฐานสำหรับ Root Blower (ยกเว้นข้อ 2 ที่เป็นระบบกรอกไฟฟ้าแยก)
+    const rootBlowerTemplate = [
+      { key: "rb_chk_1", label: "1. ทำความสะอาดรอบๆ ตู้จ่ายไฟและภายในตู้", status: "ปกติ" },
+      { key: "rb_chk_3", label: "3 (MOTOR): ตรวจเช็คเสียงมอเตอร์ไม่มีเสียงดังผิดปกติ", status: "ปกติ" },
+      { key: "rb_chk_4", label: "4 (PUMP): ตรวจเช็ค PUMP ไม่มีรอยน้ำมันซึม ไม่มีเสียงดัง", status: "ปกติ" },
+      { key: "rb_chk_5", label: "5 (PUMP): ตรวจเช็คแรงดันจากเกจวัดแรงดัน (ไม่ต่ำกว่า 2 PSI)", status: "ปกติ" },
+      { key: "rb_chk_6", label: "6 (PUMP): ตรวจเช็คโครงสร้างโดยรวม (ไม่มีการแตกหรือชำรุด)", status: "ปกติ" },
+      { key: "rb_chk_7", label: "7 (อุปกรณ์อื่นๆ): ถอด FILTER ทำความสะอาด", status: "ปกติ" },
+      { key: "rb_chk_8", label: "8 (อุปกรณ์อื่นๆ): ตรวจเช็คอุปกรณ์ไฟฟ้าทั้งหมด (สายไฟไม่มีรอยไหม้)", status: "ปกติ" },
+      { key: "rb_chk_9", label: "9 (อุปกรณ์อื่นๆ): ตรวจเช็คโครงสร้างโดยรวมทั้งหมด", status: "ปกติ" },
+      { key: "rb_chk_10", label: "10 (ประจำปี): เปลี่ยนถ่ายน้ำมันตัว PUMP", status: "ปกติ" },
+      { key: "rb_chk_11", label: "11 (ประจำปี): เปลี่ยนสายพานทั้งหมด", status: "ปกติ" },
+      { key: "rb_chk_12", label: "12 (ประจำปี): ยึดแน่นน็อตที่ตัว PUMP ใหม่ทั้งหมด", status: "ปกติ" },
+      { key: "rb_chk_13", label: "13 (ประจำปี): ยึดแน่นน็อตยึดสายไฟฟ้าใหม่ทั้งหมด", status: "ปกติ" },
+      { key: "rb_chk_14", label: "14 (ประจำปี): ตรวจค่าความเสียเฉพาะจุด", status: "ปกติ" }
+    ];
+
+    // รายการตรวจสอบมาตรฐานสำหรับ SATO Air Pump
+    const satoTemplate = [
+      { key: "sato_chk_1", label: "1. ตรวจเช็คการทำงาน", status: "ปกติ", optNormal: "ปกติ", optAbnormal: "ไม่ทำงาน" },
+      { key: "sato_chk_2", label: "2. ตรวจเช็คท่ออากาศ (ไม่มีการรั่วไหล)", status: "ปกติ", optNormal: "ปกติ", optAbnormal: "ชำรุด" }
+    ];
+
+    function App() {
+      const assignerList = ["เกรียงศักดิ์", "ณรงค์", "รัฐชานนท์"];
+      const operatorList = ["ณรงค์", "รัฐชานนท์", "บัญชา", "วสุพล", "ศรายุทธ", "พิพัฒน์", "ศรราม เอี่ยมอาจ", "วงศธร", "เกรียงศักดิ์"];
+      const todayStr = new Date().toISOString().split('T')[0];
+
+      // Form Metadata
+      const [formData, setFormData] = useState({
+        assigner: "เกรียงศักดิ์",
+        location: "อาคาร DC",
+        pmDate: todayStr,
+        startTime: "",
+        endTime: "",
+        operator1: "", operator2: "", operator3: "", operator4: "",
+        bio_chk_4: "ปกติ", // รายการข้อ 4 เติมจุลินทรีย์แบบไม่ใช้อากาศ
+        bio_chk_5: "ปกติ", // รายการข้อ 5 เติมจุลินทรีย์แบบใช้อากาศ
+        summaryText: "",
+        overallStatus: "ปกติ",
+        signee: ""
+      });
+
+      // จัดการโครงสร้างรายการปั๊มผ่าน LocalStorage เพื่อให้สามารถปรับแต่งรายการยืดหยุ่นได้ภายหลัง
+      const [rootBlowerPumps, setRootBlowerPumps] = useState(() => {
+        const saved = localStorage.getItem("pm_rb_pumps_v1");
+        return saved ? JSON.parse(saved) : defaultRootBlowerPumps;
+      });
+
+      const [satoPumps, setSatoPumps] = useState(() => {
+        const saved = localStorage.getItem("pm_sato_pumps_v1");
+        return saved ? JSON.parse(saved) : defaultSatoPumps;
+      });
+
+      const [rbResults, setRbResults] = useState({});
+      const [satoResults, setSatoResults] = useState({});
+      
+      const [isManageModalOpen, setIsManageModalOpen] = useState(false);
+      const [manageType, setManageType] = useState(""); // "RB" หรือ "SATO"
+      const [editablePumps, setEditablePumps] = useState([]);
+
+      const [isSubmitting, setIsSubmitting] = useState(false);
+      const [alertMsg, setAlertMsg] = useState("");
+      const [submitStatus, setSubmitStatus] = useState(null);
+
+      useEffect(() => {
+        localStorage.setItem("pm_rb_pumps_v1", JSON.stringify(rootBlowerPumps));
+      }, [rootBlowerPumps]);
+
+      useEffect(() => {
+        localStorage.setItem("pm_sato_pumps_v1", JSON.stringify(satoPumps));
+      }, [satoPumps]);
+
+      // Initialize ผลตรวจสอบสำหรับ Root Blower
+      useEffect(() => {
+        setRbResults(prev => {
+          const updated = { ...prev };
+          rootBlowerPumps.forEach(p => {
+            if (!updated[p.id]) {
+              updated[p.id] = {
+                v_l1_l2: "380", v_l1_l3: "380", v_l2_l3: "380",
+                i_1: "", i_2: "", i_3: "",
+                checks: rootBlowerTemplate.map(item => ({ ...item }))
+              };
+            }
+          });
+          return updated;
+        });
+      }, [rootBlowerPumps]);
+
+      // Initialize ผลตรวจสอบสำหรับ SATO Air Pump
+      useEffect(() => {
+        setSatoResults(prev => {
+          const updated = { ...prev };
+          satoPumps.forEach(p => {
+            if (!updated[p.id]) {
+              updated[p.id] = {
+                v_220: "220", i_a: "",
+                checks: satoTemplate.map(item => ({ ...item }))
+              };
+            }
+          });
+          return updated;
+        });
+      }, [satoPumps]);
+
+      const handleInputChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value }));
+      };
+
+      // ฟังก์ชันจัดการค่าทางไฟฟ้า Root Blower
+      const handleRbElectricChange = (pumpId, field, value) => {
+        setRbResults(prev => ({
+          ...prev,
+          [pumpId]: { ...prev[pumpId], [field]: value }
+        }));
+      };
+
+      // ฟังก์ชันจัดการปุ่มเช็คของ Root Blower
+      const handleRbCheckStatusChange = (pumpId, checkKey, newStatus) => {
+        setRbResults(prev => {
+          const pumpData = prev[pumpId];
+          const updatedChecks = pumpData.checks.map(c => 
+            c.key === checkKey ? { ...c, status: newStatus } : c
+          );
+          return { ...prev, [pumpId]: { ...pumpData, checks: updatedChecks } };
+        });
+      };
+
+      // ฟังก์ชันจัดการค่าทางไฟฟ้า SATO
+      const handleSatoElectricChange = (pumpId, field, value) => {
+        setSatoResults(prev => ({
+          ...prev,
+          [pumpId]: { ...prev[pumpId], [field]: value }
+        }));
+      };
+
+      // ฟังก์ชันจัดการปุ่มเช็คของ SATO
+      const handleSatoCheckStatusChange = (pumpId, checkKey, newStatus) => {
+        setSatoResults(prev => {
+          const pumpData = prev[pumpId];
+          const updatedChecks = pumpData.checks.map(c => 
+            c.key === checkKey ? { ...c, status: newStatus } : c
+          );
+          return { ...prev, [pumpId]: { ...pumpData, checks: updatedChecks } };
+        });
+      };
+
+      const openManagement = (type) => {
+        setManageType(type);
+        setEditablePumps(type === "RB" ? [...rootBlowerPumps] : [...satoPumps]);
+        setIsManageModalOpen(true);
+      };
+
+      const handleAddPump = () => {
+        const nextNum = editablePumps.length + 1;
+        if (manageType === "RB") {
+          const newId = `RB-${nextNum.toString().padStart(2, '0')}`;
+          setEditablePumps([...editablePumps, { id: newId, name: `Root Blower ตัวที่ ${nextNum}` }]);
+        } else {
+          const newId = `SATO-${nextNum.toString().padStart(2, '0')}`;
+          setEditablePumps([...editablePumps, { id: newId, name: `SATO Air Pump ตัวที่ ${nextNum}` }]);
+        }
+      };
+
+      const handleRemovePump = (id) => {
+        setEditablePumps(editablePumps.filter(p => p.id !== id));
+      };
+
+      const saveManagementChanges = () => {
+        if (manageType === "RB") {
+          setRootBlowerPumps(editablePumps);
+        } else {
+          setSatoPumps(editablePumps);
+        }
+        setIsManageModalOpen(false);
+      };
+
+      const handleFormSubmit = async (e) => {
+        e.preventDefault();
+        setAlertMsg("");
+        setSubmitStatus(null);
+
+        if (!formData.startTime || !formData.endTime || !formData.operator1 || !formData.signee) {
+          setAlertMsg("⚠️ กรุณากรอกเวลาทำงาน รายชื่อช่าง และลงชื่อผู้ปฏิบัติงานหลักให้ครบถ้วน");
+          window.scrollTo({ top: 0, behavior: "smooth" });
+          return;
+        }
+
+        setIsSubmitting(true);
+
+        try {
+          const postData = { ...formData, rootBlowerPumps, satoPumps, rbResults, satoResults };
+          await fetch(GOOGLE_WEB_APP_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({ data: JSON.stringify(postData) })
+          });
+
+          setSubmitStatus('success');
+          setAlertMsg("🎉 บันทึกข้อมูลรายงานระบบบำบัดน้ำเสียลง Google Sheet เรียบร้อยแล้ว!");
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        } catch (err) {
+          setSubmitStatus('error');
+          setAlertMsg("❌ ส่งข้อมูลไม่สำเร็จ โปรดตรวจสอบสัญญาณอินเทอร์เน็ตหรือลิงก์ Web App");
+        } finally {
+          setIsSubmitting(false);
+        }
+      };
+
+      return (
+        <div className="max-w-md mx-auto min-h-screen flex flex-col justify-between">
+          <div>
+            {/* Header ส่วนหัวกระดาษมาตรฐานสเปก CP ALL */}
+            <header className="bg-white shadow-sm border-b-4 border-green-600 sticky top-0 z-30">
+              <div className="p-4">
+                <div className="flex items-center justify-between">
+                  <span className="bg-green-600 text-white text-[10px] font-black px-2 py-0.5 rounded">CP ALL</span>
+                  <span className="text-[10px] text-slate-400 font-bold flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-3 h-3 mr-1 text-slate-400">
+                      <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
+                      <line x1="12" y1="18" x2="12.01" y2="18" />
+                    </svg>
+                    ระบบบันทึกโมบายแอป
+                  </span>
+                </div>
+                <h1 className="text-md font-extrabold text-slate-900 mt-1">บริษัท ซีพีออลล์ จำกัด (มหาชน)</h1>
+                <h2 className="text-xs font-bold text-slate-600 mt-0.5 flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-green-600 mr-1.5 w-3 h-3">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                  </svg>
+                  Check Sheet การบำรุงรักษาเครื่องจักร/อุปกรณ์
+                </h2>
+                <div className="grid grid-cols-3 gap-1 mt-2.5 pt-2 border-t border-slate-100 text-[9px] text-slate-500 font-semibold">
+                  <div>รหัส: <span className="text-slate-800 font-bold">B3-FM-10-01-06</span></div>
+                  <div className="text-center">ปรับปรุงครั้งที่: <span className="text-slate-800 font-bold">0</span></div>
+                  <div className="text-right">ประกาศใช้: <span className="text-slate-800 font-bold">1 เม.ย. 2560</span></div>
+                </div>
+              </div>
+            </header>
+
+            {/* ส่วนเนื้อหาหลักฟอร์ม */}
+            <main className="p-4 space-y-4 animate-fadeIn">
+              {alertMsg && (
+                <div className={`p-4 rounded-2xl text-xs font-bold text-center border-2 ${submitStatus === 'success' ? 'bg-green-100 border-green-400 text-green-800' : 'bg-red-100 border-red-400 text-red-800'}`}>
+                  {alertMsg}
+                </div>
+              )}
+
+              <form onSubmit={handleFormSubmit} className="space-y-4">
+                {/* หมวดหมู่ข้อมูลหลักอุปกรณ์สถานที่ */}
+                <section className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100 space-y-3 text-xs">
+                  <div className="flex items-center text-green-700 font-bold border-b pb-2 text-sm">
+                    <span>📊 ข้อมูลแผนงานบำรุงรักษา</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    <div className="col-span-2">
+                      <span className="text-slate-400 font-semibold">เครื่องจักร/อุปกรณ์</span>
+                      <p className="font-bold text-slate-800 mt-1 px-3 py-2 bg-slate-50 rounded-xl border border-slate-100">ระบบบำบัดน้ำเสีย และปั๊มเติมอากาศ</p>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 font-semibold">ความถี่</span>
+                      <p className="font-bold text-slate-800 mt-1 px-3 py-2 bg-slate-50 rounded-xl border border-slate-100">รอบประจำเดือน</p>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 font-semibold">สถานที่</span>
+                      <p className="font-bold text-slate-800 mt-1 px-3 py-2 bg-slate-50 rounded-xl border border-slate-100">{formData.location}</p>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-100 space-y-3">
+                    <div>
+                      <label className="font-bold text-slate-500">📅 วันที่ทำ PM</label>
+                      <input type="date" name="pmDate" value={formData.pmDate} onChange={handleInputChange} className="w-full mt-1 p-2 border rounded-xl bg-slate-50/50 text-xs outline-none focus:ring-2 focus:ring-green-500" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="font-bold text-slate-500">⏰ เวลาเริ่ม</label>
+                        <input type="time" name="startTime" value={formData.startTime} onChange={handleInputChange} className="w-full mt-1 p-2 border rounded-xl bg-slate-50/50 text-xs outline-none focus:ring-2 focus:ring-green-500" />
+                      </div>
+                      <div>
+                        <label className="font-bold text-slate-500">⏰ เวลาสิ้นสุด</label>
+                        <input type="time" name="endTime" value={formData.endTime} onChange={handleInputChange} className="w-full mt-1 p-2 border rounded-xl bg-slate-50/50 text-xs outline-none focus:ring-2 focus:ring-green-500" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="font-bold text-slate-500">👤 ผู้มอบหมายงาน</label>
+                      <input list="assigners" name="assigner" value={formData.assigner} onChange={handleInputChange} className="w-full mt-1 p-2 border rounded-xl bg-slate-50/50 text-xs font-bold outline-none focus:ring-2 focus:ring-green-500" />
+                    </div>
+                    <div>
+                      <label className="font-bold text-slate-500">👥 รายชื่อช่างปฏิบัติงาน (ระบุสูงสุด 4 คน)</label>
+                      <div className="grid grid-cols-2 gap-2 mt-1">
+                        {[1, 2, 3, 4].map(n => (
+                          <input key={n} list="operators" name={`operator${n}`} value={formData[`operator${n}`]} onChange={handleInputChange} placeholder={`ช่างคนที่ ${n}`} className="p-2 border rounded-xl text-xs bg-slate-50/50 font-semibold outline-none focus:ring-2 focus:ring-green-500" />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+                {/* กลุ่มที่ 1: Root Blower Section */}
+                <div className="flex justify-between items-center text-xs font-bold px-1">
+                  <span className="text-slate-400 uppercase">1. หมวด Root Blower ({rootBlowerPumps.length})</span>
+                  <button type="button" onClick={() => openManagement("RB")} className="text-green-600 hover:underline">🔧 จัดการรายการ</button>
+                </div>
+
+                {rootBlowerPumps.map((pump) => {
+                  const data = rbResults[pump.id] || { v_l1_l2: "380", v_l1_l3: "380", v_l2_l3: "380", i_1: "", i_2: "", i_3: "", checks: [] };
+                  return (
+                    <section key={pump.id} className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm space-y-4">
+                      <div className="flex items-center justify-between border-b pb-2">
+                        <span className="bg-green-100 text-green-800 text-[10px] font-bold px-2 py-0.5 rounded-lg">{pump.id}</span>
+                        <span className="text-xs font-bold text-slate-800 truncate pl-2">{pump.name}</span>
+                      </div>
+
+                      {/* ลำดับที่ 1 การเช็คทั่วไปข้อ 1 */}
+                      {data.checks.filter(c => c.key === "rb_chk_1").map(item => (
+                        <div key={item.key} className="p-2.5 bg-slate-50 border rounded-xl flex flex-col space-y-1.5">
+                          <span className="text-[11px] font-bold text-slate-700">{item.label}</span>
+                          <div className="flex space-x-1">
+                            <button type="button" onClick={() => handleRbCheckStatusChange(pump.id, item.key, "ปกติ")} className={`flex-1 py-1 rounded-md text-[10px] font-extrabold border ${item.status === "ปกติ" ? "bg-green-600 text-white border-green-600" : "bg-white text-slate-400"}`}>🟢 ปกติ</button>
+                            <button type="button" onClick={() => handleRbCheckStatusChange(pump.id, item.key, "ไม่ปกติ")} className={`flex-1 py-1 rounded-md text-[10px] font-extrabold border ${item.status === "ไม่ปกติ" ? "bg-red-500 text-white border-red-500" : "bg-white text-slate-400"}`}>🔴 ไม่ปกติ</button>
+                          </div>
+                        </div>
+                      ))}
+
+                      {/* ลำดับที่ 2 ระบบตรวจแรงดันไฟฟ้าและกระแส */}
+                      <div className="space-y-3 bg-slate-50 p-3 rounded-2xl border border-slate-200 text-[11px]">
+                        <div className="font-bold text-slate-700">⚡ ลำดับที่ 2: ตรวจสอบสภาพแรงดัน และกระแสไฟฟ้า</div>
+                        <div>
+                          <span className="text-[10px] text-slate-400 font-bold block mb-1">แรงดันไฟฟ้า (V)</span>
+                          <div className="grid grid-cols-3 gap-2">
+                            {["v_l1_l2", "v_l1_l3", "v_l2_l3"].map((f) => (
+                              <div key={f}>
+                                <label className="text-[9px] text-slate-400 font-bold uppercase">{f.replace("v_", "").replace("_", "-")}</label>
+                                <input type="number" value={data[f]} onChange={(e) => handleRbElectricChange(pump.id, f, e.target.value)} className="w-full p-1.5 border rounded-lg text-center font-bold text-xs bg-white text-slate-800 outline-none" />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-slate-400 font-bold block mb-1">กระแสไฟฟ้า (A)</span>
+                          <div className="grid grid-cols-3 gap-2">
+                            {["i_1", "i_2", "i_3"].map((f, i) => (
+                              <div key={f}>
+                                <label className="text-[9px] text-slate-400 font-bold">I{i+1} (A)</label>
+                                <input type="number" placeholder="0" value={data[f]} onChange={(e) => handleRbElectricChange(pump.id, f, e.target.value)} className="w-full p-1.5 border rounded-lg text-center font-bold text-xs bg-white text-slate-800 outline-none" />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* ลำดับที่ 3 - 14 รายการข้ออื่นๆ ของ Root Blower */}
+                      <div className="space-y-2">
+                        {data.checks.filter(c => c.key !== "rb_chk_1").map((item) => (
+                          <div key={item.key} className="flex flex-col p-2.5 bg-slate-50/60 border rounded-xl space-y-1.5">
+                            <span className="text-[11px] font-bold text-slate-700 leading-tight">{item.label}</span>
+                            <div className="flex space-x-1">
+                              <button type="button" onClick={() => handleRbCheckStatusChange(pump.id, item.key, "ปกติ")} className={`flex-1 py-1 rounded-md text-[10px] font-extrabold border ${item.status === "ปกติ" ? "bg-green-600 text-white border-green-600" : "bg-white text-slate-400"}`}>🟢 ปกติ</button>
+                              <button type="button" onClick={() => handleRbCheckStatusChange(pump.id, item.key, "ไม่ปกติ")} className={`flex-1 py-1 rounded-md text-[10px] font-extrabold border ${item.status === "ไม่ปกติ" ? "bg-red-500 text-white border-red-500" : "bg-white text-slate-400"}`}>🔴 ไม่ปกติ</button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                  );
+                })}
+
+                {/* กลุ่มที่ 2: SATO Air Pump Section */}
+                <div className="flex justify-between items-center text-xs font-bold px-1 pt-2">
+                  <span className="text-slate-400 uppercase">2. หมวด SATO Air Pump ({satoPumps.length})</span>
+                  <button type="button" onClick={() => openManagement("SATO")} className="text-green-600 hover:underline">🔧 จัดการรายการ</button>
+                </div>
+
+                {satoPumps.map((pump) => {
+                  const data = satoResults[pump.id] || { v_220: "220", i_a: "", checks: [] };
+                  return (
+                    <section key={pump.id} className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm space-y-3">
+                      <div className="flex items-center justify-between border-b pb-1.5">
+                        <span className="bg-blue-100 text-blue-800 text-[10px] font-bold px-2 py-0.5 rounded-lg">{pump.id}</span>
+                        <span className="text-xs font-bold text-slate-700 truncate pl-2 flex-1 text-right">{pump.name}</span>
+                      </div>
+
+                      {/* ลูปข้อ 1 และข้อ 2 ของ SATO */}
+                      <div className="grid grid-cols-1 gap-2">
+                        {data.checks.map((item) => (
+                          <div key={item.key} className="p-2 bg-slate-50 rounded-xl border border-slate-100 flex flex-col space-y-1">
+                            <span className="text-[11px] font-bold text-slate-700">{item.label}</span>
+                            <div className="flex space-x-1">
+                              <button type="button" onClick={() => handleSatoCheckStatusChange(pump.id, item.key, "ปกติ")} className={`flex-1 py-1 rounded-md text-[10px] font-bold border ${item.status === "ปกติ" ? "bg-green-600 text-white border-green-600" : "bg-white text-slate-400"}`}>🟢 {item.optNormal}</button>
+                              <button type="button" onClick={() => handleSatoCheckStatusChange(pump.id, item.key, "ไม่ปกติ")} className={`flex-1 py-1 rounded-md text-[10px] font-bold border ${item.status === "ไม่ปกติ" ? "bg-red-500 text-white border-red-500" : "bg-white text-slate-400"}`}>🔴 {item.optAbnormal}</button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* ลำดับที่ 3 ระบบไฟฟ้าของ SATO */}
+                      <div className="p-3.5 bg-slate-50 border rounded-2xl space-y-2 text-[11px]">
+                        <span className="font-bold text-slate-700 block">⚡ 3. ตรวจเช็คระบบไฟฟ้า</span>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="text-[10px] text-slate-400 font-bold">3.1 แรงดันไฟฟ้า (V)</label>
+                            <input type="number" placeholder="220" value={data.v_220} onChange={(e) => handleSatoElectricChange(pump.id, "v_220", e.target.value)} className="w-full mt-0.5 p-1.5 border rounded-lg text-center font-bold bg-white text-slate-800 outline-none" />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-slate-400 font-bold">3.2 กระแสไฟฟ้า (A)</label>
+                            <input type="number" placeholder="0" value={data.i_a} onChange={(e) => handleSatoElectricChange(pump.id, "i_a", e.target.value)} className="w-full mt-0.5 p-1.5 border rounded-lg text-center font-bold bg-white text-slate-800 outline-none" />
+                          </div>
+                        </div>
+                      </div>
+                    </section>
+                  );
+                })}
+
+                {/* กลุ่มที่ 3: ระบบเติมจุลินทรีย์บำบัดภาพรวม */}
+                <section className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 space-y-3 text-xs">
+                  <div className="font-bold text-green-700 uppercase border-b pb-2">🦠 3. งานเติมจุลินทรีย์ระบบบำบัดน้ำเสีย</div>
+                  
+                  <div className="flex flex-col p-3 bg-slate-50 border rounded-xl space-y-2">
+                    <span className="text-[11px] font-bold text-slate-700 leading-tight">4. เติมจุลินทรีย์แบบไม่ใช้อากาศ แช่น้ำพักไว้ 1 ชม. ก่อนเทลงชักโครก ทั้ง 7 จุด</span>
+                    <div className="flex space-x-1">
+                      <button type="button" onClick={() => setFormData(p => ({ ...p, bio_chk_4: "ปกติ" }))} className={`flex-1 py-1.5 rounded-md text-[10px] font-bold border ${formData.bio_chk_4 === "ปกติ" ? "bg-green-600 text-white border-green-600" : "bg-white text-slate-400"}`}>🟢 ทำเรียบร้อย</button>
+                      <button type="button" onClick={() => setFormData(p => ({ ...p, bio_chk_4: "ไม่ปกติ" }))} className={`flex-1 py-1.5 rounded-md text-[10px] font-bold border ${formData.bio_chk_4 === "ไม่ปกติ" ? "bg-red-500 text-white border-red-500" : "bg-white text-slate-400"}`}>🔴 มีปัญหา/เว้นไว้</button>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col p-3 bg-slate-50 border rounded-xl space-y-2">
+                    <span className="text-[11px] font-bold text-slate-700 leading-tight">5. เติมจุลินทรีย์แบบใช้อากาศ แช่น้ำพักไว้ 1 ชม. ก่อนเทลงถังเติมอากาศ ทั้ง 7 จุด</span>
+                    <div className="flex space-x-1">
+                      <button type="button" onClick={() => setFormData(p => ({ ...p, bio_chk_5: "ปกติ" }))} className={`flex-1 py-1.5 rounded-md text-[10px] font-bold border ${formData.bio_chk_5 === "ปกติ" ? "bg-green-600 text-white border-green-600" : "bg-white text-slate-400"}`}>🟢 ทำเรียบร้อย</button>
+                      <button type="button" onClick={() => setFormData(p => ({ ...p, bio_chk_5: "ไม่ปกติ" }))} className={`flex-1 py-1.5 rounded-md text-[10px] font-bold border ${formData.bio_chk_5 === "ไม่ปกติ" ? "bg-red-500 text-white border-red-500" : "bg-white text-slate-400"}`}>🔴 มีปัญหา/เว้นไว้</button>
+                    </div>
+                  </div>
+                </section>
+
+                {/* สรุปผลรายงานและการเซ็นชื่อหน้าสุดท้าย */}
+                <section className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 space-y-3 text-xs">
+                  <div className="font-bold text-slate-400 uppercase">📌 สรุปผลการ PM ภาพรวมระบบบำบัด</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button type="button" onClick={() => setFormData(p => ({ ...p, overallStatus: "ปกติ" }))} className={`p-2.5 rounded-xl border font-bold text-center ${formData.overallStatus === "ปกติ" ? "bg-green-600 text-white" : "bg-white"}`}>🟢 ปกติ</button>
+                    <button type="button" onClick={() => setFormData(p => ({ ...p, overallStatus: "ไม่ปกติ" }))} className={`p-2.5 rounded-xl border font-bold text-center ${formData.overallStatus === "ไม่ปกติ" ? "bg-red-500 text-white" : "bg-white"}`}>🔴 ไม่ปกติ</button>
+                  </div>
+                  
+                  <div className="pt-1">
+                    <label className="font-bold text-slate-400 block mb-1">✍️ หมายเหตุ/รายงานเพิ่มเติม</label>
+                    <textarea name="summaryText" value={formData.summaryText} onChange={handleInputChange} rows="2" placeholder="พิมพ์ข้อความสรุปงานหรือข้อเสนอแนะ..." className="w-full p-2.5 border rounded-xl outline-none text-xs bg-slate-50/50" />
+                  </div>
+
+                  <div className="pt-1">
+                    <label className="font-bold text-slate-500 block">🖋️ ผู้บันทึกรายงาน (ลงชื่อผู้ปฏิบัติงาน)</label>
+                    <input list="operators" name="signee" value={formData.signee} onChange={handleInputChange} placeholder="เลือกหรือพิมพ์ชื่อช่างผู้ส่งงาน" className="w-full mt-1 p-2 border rounded-xl bg-slate-50 font-bold text-xs outline-none focus:ring-2 focus:ring-green-500" />
+                  </div>
+                </section>
+
+                {/* ปุ่มกดยืนยันการส่งข้อมูลเข้าระบบ */}
+                <div className="bg-white p-3 rounded-3xl shadow-sm border border-slate-100">
+                  <button type="submit" disabled={isSubmitting} className="w-full py-3.5 bg-green-600 hover:bg-green-700 text-white text-xs font-bold rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center">
+                    {isSubmitting ? "🚀 กำลังบันทึกประวัติเข้า Google Sheet..." : "💾 ยืนยันส่งรายงานบันทึกข้อมูล PM"}
+                  </button>
+                </div>
+              </form>
+            </main>
+          </div>
+
+          <footer className="text-center text-[9px] text-slate-400 font-medium my-4">
+            <p>© 2026 CP ALL DC ENGINEERING DEPARTMENT ALL RIGHTS RESERVED</p>
+          </footer>
+
+          {/* หน้าต่าง Modal จัดการเพิ่ม/ลดรายการเครื่องสูบน้ำแบบยืดหยุ่นได้ย้อนหลัง */}
+          {isManageModalOpen && (
+            <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-end justify-center">
+              <div className="bg-white w-full max-w-md rounded-t-3xl p-4 flex flex-col max-h-[80vh] shadow-xl">
+                <div className="flex justify-between items-center pb-2 border-b">
+                  <h3 className="text-xs font-bold text-slate-700">🔧 จัดการพิกัดรายการปั๊ม ({manageType})</h3>
+                  <button type="button" onClick={() => setIsManageModalOpen(false)} className="text-xs font-bold text-slate-400 hover:text-slate-600">ปิด</button>
+                </div>
+                
+                <div className="pt-2">
+                  <button type="button" onClick={handleAddPump} className="w-full py-2 bg-slate-100 text-slate-700 font-bold text-[11px] rounded-xl flex items-center justify-center border border-dashed border-slate-300">
+                    <span>➕ เพิ่มชุดอุปกรณ์ใหม่ในระบบ</span>
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto py-2 space-y-2 no-scrollbar">
+                  {editablePumps.map((pump) => (
+                    <div key={pump.id} className="flex items-center space-x-2 bg-slate-50 p-1.5 rounded-xl border border-slate-100">
+                      <input type="text" value={pump.id} onChange={(e) => {
+                        const val = e.target.value;
+                        setEditablePumps(prev => prev.map(item => item.id === pump.id ? { ...item, id: val } : item))
+                      }} className="text-[11px] font-bold text-slate-700 w-20 text-center border bg-white rounded-lg p-1" />
+                      
+                      <input type="text" value={pump.name} onChange={(e) => {
+                        const val = e.target.value;
+                        setEditablePumps(prev => prev.map(item => item.id === pump.id ? { ...item, name: val } : item))
+                      }} className="flex-1 p-1.5 border bg-white rounded-lg text-xs font-semibold" />
+                      
+                      <button type="button" onClick={() => handleRemovePump(pump.id)} className="p-1.5 text-slate-400 hover:text-red-500 rounded-lg">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2.5" stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                
+                <div className="pt-2 border-t flex space-x-2">
+                  <button type="button" onClick={() => setIsManageModalOpen(false)} className="flex-1 py-2.5 bg-slate-100 text-slate-600 text-xs font-bold rounded-xl">ยกเลิก</button>
+                  <button type="button" onClick={saveManagementChanges} className="flex-1 py-2.5 bg-green-600 text-white text-xs font-bold rounded-xl">บันทึก</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* แหล่งข้อมูลลิสต์อัตโนมัติสำหรับการกรอกเร็ว */}
+          <datalist id="assigners">{assignerList.map((n, i) => <option key={i} value={n} />)}</datalist>
+          <datalist id="operators">{operatorList.map((n, i) => <option key={i} value={n} />)}</datalist>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
