@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Check Sheet PM - Emergency & Exit Light</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Anuphan:wght@300;400;500;600;700&display=swap');
+    body {
+      font-family: 'Anuphan', sans-serif;
+    }
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fadeIn {
+      animation: fadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen pb-12">
+
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo } = React;
+
+    // 🔴 ใส่ลิงก์ Web App ของคุณที่ได้จากขั้นตอนการ Deploy ในนี้
+    const GOOGLE_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzSIaIpeK2jKe-f0H7YnnCvotfqkhqfPOL8jG0WX9l81rSOPkEvUwgE-x1WnGUIwc6z/exec";
+
+    const initialLampsData = [
+      { id: "EL-01", location: "ออฟฟิศ EN", status: "ปกติ", testResult: "" },
+      { id: "EL-02", location: "ออฟฟิศ EN", status: "ปกติ", testResult: "" },
+      { id: "EL-03", location: "MDB", status: "ปกติ", testResult: "" },
+      { id: "EL-04", location: "หน้าออฟฟิศ EN", status: "ปกติ", testResult: "" },
+      { id: "EL-05", location: "หน้าห้อง GEN", status: "ปกติ", testResult: "" },
+      { id: "EL-06", location: "ในห้อง GEN", status: "ปกติ", testResult: "" },
+      { id: "EL-07", location: "ทางเดินหน้าห้องแบต", status: "ปกติ", testResult: "" },
+      { id: "EL-08", location: "ห้องแบต", status: "ปกติ", testResult: "" },
+      { id: "EL-09", location: "ห้องแบต", status: "ปกติ", testResult: "" },
+      { id: "EL-10", location: "ห้องแบต", status: "ปกติ", testResult: "" },
+      { id: "EL-11", location: "ห้องแบต", status: "ปกติ", testResult: "" },
+      { id: "EL-12", location: "ห้องอัดกระดาษ", status: "ปกติ", testResult: "" },
+      { id: "EL-13", location: "ท้ายซอย 92", status: "ปกติ", testResult: "" },
+      { id: "EL-14", location: "หลังห้อง PIL", status: "ปกติ", testResult: "" },
+      { id: "EL-15", location: "ท้ายซอย 84", status: "ปกติ", testResult: "" },
+      { id: "EL-16", location: "ท้ายซอย 79", status: "ปกติ", testResult: "" },
+      { id: "EL-17", location: "ท้ายซอย 78", status: "ปกติ", testResult: "" },
+      { id: "EL-18", location: "ท้ายซอย 72", status: "ปกติ", testResult: "" },
+      { id: "EL-19", location: "ท้ายซอย 67", status: "ปกติ", testResult: "" },
+      { id: "EL-20", location: "ท้ายซอย 60", status: "ปกติ", testResult: "" },
+      { id: "EL-21", location: "ท้ายซอย 49", status: "ปกติ", testResult: "" },
+      { id: "EL-22", location: "ท้ายซอย 42", status: "ปกติ", testResult: "" },
+      { id: "EL-23", location: "ท้ายซอย 36", status: "ปกติ", testResult: "" },
+      { id: "EL-24", location: "หลังแผนกรับคืน", status: "ปกติ", testResult: "" },
+      { id: "EL-25", location: "ลานพาเลทโฟร์วิล", status: "ปกติ", testResult: "" },
+      { id: "EL-26", location: "ลานพาเลทโฟร์วิล", status: "ปกติ", testResult: "" },
+      { id: "EL-27", location: "หน้าซอย 40", status: "ปกติ", testResult: "" },
+      { id: "EL-28", location: "หน้าซอย 51", status: "ปกติ", testResult: "" },
+      { id: "EL-29", location: "หน้าซอย 58", status: "ปกติ", testResult: "" },
+      { id: "EL-30", location: "หน้าซอย 69", status: "ปกติ", testResult: "" },
+      { id: "EL-31", location: "หน้าซอย 76", status: "ปกติ", testResult: "" },
+      { id: "EL-32", location: "หน้าซอย 87", status: "ปกติ", testResult: "" },
+      { id: "EL-33", location: "หน้าซอย 90", status: "ปกติ", testResult: "" },
+      { id: "EL-34", location: "ประตูโหลด 48", status: "ปกติ", testResult: "" },
+      { id: "EL-35", location: "ประตูโหลด 45", status: "ปกติ", testResult: "" },
+      { id: "EL-36", location: "ประตูโหลด 41", status: "ปกติ", testResult: "" },
+      { id: "EL-37", location: "ประตูโหลด 37", status: "ปกติ", testResult: "" },
+      { id: "EL-38", location: "ประตูโหลด 33", status: "ปกติ", testResult: "" },
+      { id: "EL-39", location: "ออฟฟิศรับ(ล่าง)", status: "ปกติ", testResult: "" },
+      { id: "EL-40", location: "ออฟฟิศรับ(บน)", status: "ปกติ", testResult: "" },
+      { id: "EL-41", location: "ประตูโหลด 27", status: "ปกติ", testResult: "" },
+      { id: "EL-42", location: "ประตูโหลด 23", status: "ปกติ", testResult: "" },
+      { id: "EL-43", location: "ประตูโหลด 19", status: "ปกติ", testResult: "" },
+      { id: "EL-44", location: "ประตูโหลด 15", status: "ปกติ", testResult: "" },
+      { id: "EL-45", location: "ประตูโหลด 11", status: "ปกติ", testResult: "" },
+      { id: "EL-46", location: "ประตูโหลด 7", status: "ปกติ", testResult: "" },
+      { id: "EL-47", location: "ประตูโหลด 3", status: "ปกติ", testResult: "" },
+      { id: "EL-48", location: "ประตูออฟฟิศชั้น1", status: "ปกติ", testResult: "" },
+      { id: "EL-49", location: "รับคืนส่ง", status: "ปกติ", testResult: "" },
+      { id: "EL-50", location: "หน้าห้องเชฟ", status: "ปกติ", testResult: "" },
+      { id: "EL-51", location: "ห้องบัตร", status: "ปกติ", testResult: "" },
+      { id: "EL-52", location: "ห้อง B/C 2", status: "ปกติ", testResult: "" },
+      { id: "EL-53", location: "ห้อง B/C 2", status: "ปกติ", testResult: "" },
+      { id: "EL-54", location: "ห้อง POP", status: "ปกติ", testResult: "" },
+      { id: "EL-55", location: "ห้องสโตร์ วิศวะ", status: "ปกติ", testResult: "" },
+      { id: "EL-56", location: "ห้องล็อกเกอร์", status: "ปกติ", testResult: "" },
+      { id: "EL-57", location: "หน้าห้องน้ำล็อกเกอร์", status: "ปกติ", testResult: "" },
+      { id: "EL-58", location: "ห้องน้ำล็อกเกอร์ ชาย", status: "ปกติ", testResult: "" },
+      { id: "EL-59", location: "ห้องคอนโทรล", status: "ปกติ", testResult: "" },
+      { id: "EL-60", location: "ห้องพยาบาล", status: "ปกติ", testResult: "" },
+      { id: "EL-61", location: "ห้องพยาบาล", status: "ปกติ", testResult: "" },
+      { id: "EL-62", location: "โรงอาหารชั้น 3 หลังตู้กาแฟ", status: "ปกติ", testResult: "" },
+      { id: "EL-63", location: "ห้องพักผ่อนหญิง", status: "ปกติ", testResult: "" },
+      { id: "EL-64", location: "ห้องพักผ่อนชาย", status: "ปกติ", testResult: "" },
+      { id: "EL-65", location: "หน้าห้องพักผ่อนชาย", status: "ปกติ", testResult: "" },
+      { id: "EL-66", location: "ข้างตู้น้ำดื่ม 6, 7", status: "ปกติ", testResult: "" },
+      { id: "EL-67", location: "โรงอาหารชั้น 2 จุดตักข้าว", status: "ปกติ", testResult: "" },
+      { id: "EL-68", location: "บันไดทางขึ้นโรงอาหาร", status: "ปกติ", testResult: "" },
+      { id: "EL-69", location: "ทางเข้าออฟฟิศชั้น 2", status: "ปกติ", testResult: "" },
+      { id: "EL-70", location: "ทางเข้าห้องน้ำโรงอาหารชั้น 2", status: "ปกติ", testResult: "" },
+      { id: "EL-71", location: "ห้องน้ำชาย โรงอาหารชั้น 2", status: "ปกติ", testResult: "" },
+      { id: "EL-72", location: "ห้องน้ำหญิง โรงอาหารชั้น 2", status: "ปกติ", testResult: "" },
+      { id: "EL-73", location: "ห้องแดนดิน", status: "ปกติ", testResult: "" },
+      { id: "EL-74", location: "ห้องแดนดิน", status: "ปกติ", testResult: "" },
+      { id: "EL-75", location: "ออฟฟิศชั้น 2", status: "ปกติ", testResult: "" },
+      { id: "EL-76", location: "หน้าห้องเบญจฯ", status: "ปกติ", testResult: "" },
+      { id: "EL-77", location: "ห้องน้ำชาย ออฟฟิศชั้น 2", status: "ปกติ", testResult: "" },
+      { id: "EL-78", location: "ห้องน้ำหญิง ออฟฟิศชั้น 2", status: "ปกติ", testResult: "" },
+      { id: "EL-79", location: "ทางขึ้น ร.5", status: "ปกติ", testResult: "" },
+      { id: "EL-80", location: "ตู้กาแฟ โรงอาหาร SUP", status: "ปกติ", testResult: "" },
+      { id: "EL-81", location: "ห้องน้ำชาย โรงอาหาร SUP", status: "ปกติ", testResult: "" },
+      { id: "EL-82", location: "ห้องน้ำหญิง โรงอาหาร SUP", status: "ปกติ", testResult: "" },
+      { id: "EL-83", location: "ทางขึ้นออฟฟิศไดนามิค", status: "ปกติ", testResult: "" },
+      { id: "EL-84", location: "ชั้น 2 โรงอาหาร SUP", status: "ปกติ", testResult: "" },
+      { id: "EL-85", location: "ห้องปั๊มน้ำ", status: "ปกติ", testResult: "" },
+      { id: "EL-86", location: "ทางขึ้นออฟฟิศไดนามิค", status: "ปกติ", testResult: "" },
+      { id: "EL-87", location: "ห้อง Friend corner", status: "ปกติ", testResult: "" },
+      { id: "EL-88", location: "ออฟฟิศขนส่ง", status: "ปกติ", testResult: "" },
+      { id: "EL-89", location: "พื้นที่ ALL Cafe", status: "ปกติ", testResult: "" },
+      { id: "EL-90", location: "พื้นที่ ALL Cafe", status: "ปกติ", testResult: "" }
+    ];
+
+    function App() {
+      const assignerList = ["เกรียงศักดิ์", "ณรงค์", "รัฐชานนท์"];
+      const operatorList = ["ณรงค์", "รัฐชานนท์", "บัญชา", "วสุพล", "ศรายุทธ", "พิพัฒน์", "ศรราม เอี่ยมอาจ", "วงศธร", "เกรียงศักดิ์"];
+      const todayStr = new Date().toISOString().split('T')[0];
+
+      const [formData, setFormData] = useState({
+        assigner: "เกรียงศักดิ์", pmDate1: todayStr, startTime1: "", endTime1: "",
+        operator1_1: "", operator1_2: "", operator1_3: "", operator1_4: "",
+        pmDate2: "", startTime2: "", endTime2: "",
+        operator2_1: "", operator2_2: "", operator2_3: "", operator2_4: "",
+        summaryText: "", overallStatus: "ปกติ"
+      });
+
+      const [elLamps, setElLamps] = useState(() => {
+        const saved = localStorage.getItem("el_lamps_data_v8");
+        return saved ? JSON.parse(saved) : initialLampsData;
+      });
+
+      const [searchQuery, setSearchQuery] = useState("");
+      const [filterStatus, setFilterStatus] = useState("ทั้งหมด");
+      const [isManageModalOpen, setIsManageModalOpen] = useState(false);
+      const [editableLamps, setEditableLamps] = useState([]);
+      const [isSubmitting, setIsSubmitting] = useState(false);
+      const [alertMsg, setAlertMsg] = useState("");
+      const [submitStatus, setSubmitStatus] = useState(null);
+
+      useEffect(() => {
+        localStorage.setItem("el_lamps_data_v8", JSON.stringify(elLamps));
+      }, [elLamps]);
+
+      const handleInputChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value }));
+      };
+
+      const changeLampStatus = (id, newStatus) => {
+        setElLamps(prev => prev.map(l => {
+          if (l.id === id) {
+            return { ...l, status: newStatus, testResult: newStatus === "ใช้รีโมทเทส 30 นาที" ? "ผ่าน" : "" };
+          }
+          return l;
+        }));
+      };
+
+      const changeTestResult = (id, result) => {
+        setElLamps(prev => prev.map(l => {
+          if (l.id === id) {
+            return { 
+              ...l, 
+              testResult: result, 
+              status: result === "ไม่ผ่าน" ? "ไม่ปกติ" : "ใช้รีโมทเทส 30 นาที" 
+            };
+          }
+          return l;
+        }));
+      };
+
+      const openManagementModal = () => {
+        setEditableLamps([...elLamps]);
+        setIsManageModalOpen(true);
+      };
+
+      const handleAddItem = () => {
+        const nextNum = editableLamps.length + 1;
+        const newId = `EL-${nextNum.toString().padStart(2, '0')}`;
+        setEditableLamps([...editableLamps, { id: newId, location: "", status: "ปกติ", testResult: "" }]);
+      };
+
+      const handleRemoveItem = (id) => {
+        setEditableLamps(editableLamps.filter(item => item.id !== id));
+      };
+
+      const saveManagementChanges = () => {
+        setElLamps(editableLamps);
+        setIsManageModalOpen(false);
+      };
+
+      const handleFormSubmit = async (e) => {
+        e.preventDefault();
+        setAlertMsg("");
+        setSubmitStatus(null);
+
+        if (!formData.startTime1 || !formData.endTime1 || !formData.operator1_1) {
+          setAlertMsg("⚠️ กรุณากรอกเวลาทำงาน และผู้ปฏิบัติงานหลัก (วันที่ 1) ให้ครบถ้วนก่อนส่ง");
+          window.scrollTo({ top: 0, behavior: "smooth" });
+          return;
+        }
+
+        setIsSubmitting(true);
+
+        try {
+          const postData = { ...formData, elLamps };
+          await fetch(GOOGLE_WEB_APP_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({ data: JSON.stringify(postData) })
+          });
+
+          setSubmitStatus('success');
+          setAlertMsg("🎉 บันทึกข้อมูลและจัดส่งเข้าฐานข้อมูล Google Sheet สำเร็จเสร็จสิ้น!");
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        } catch (err) {
+          setSubmitStatus('error');
+          setAlertMsg("❌ ส่งข้อมูลไม่สำเร็จ โปรดตรวจสอบการอัปเดตเวอร์ชันแอปหรืออินเทอร์เน็ต");
+        } finally {
+          setIsSubmitting(false);
+        }
+      };
+
+      const filteredLamps = useMemo(() => {
+        return elLamps.filter(l => {
+          const matchSearch = l.id.toLowerCase().includes(searchQuery.toLowerCase()) || l.location.toLowerCase().includes(searchQuery.toLowerCase());
+          let matchStatus = false;
+          if (filterStatus === "ทั้งหมด") matchStatus = true;
+          else if (filterStatus === "ปกติ") matchStatus = l.status === "ปกติ";
+          else if (filterStatus === "ไม่ปกติ") matchStatus = l.status === "ไม่ปกติ" || l.testResult === "ไม่ผ่าน";
+          return matchSearch && matchStatus;
+        });
+      }, [elLamps, searchQuery, filterStatus]);
+
+      return (
+        <div className="max-w-md mx-auto min-h-screen flex flex-col justify-between">
+          
+          <div>
+            {/* Header คลีนพรีเมียม สเปก CP ALL */}
+            <header className="bg-white shadow-sm border-b-4 border-green-600 sticky top-0 z-30">
+              <div className="p-4">
+                <div className="flex items-center justify-between">
+                  <span className="bg-green-600 text-white text-[10px] font-black px-2 py-0.5 rounded">CP ALL</span>
+                  <span className="text-[10px] text-slate-400 font-bold flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-3 h-3 mr-1 text-slate-400">
+                      <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
+                      <line x1="12" y1="18" x2="12.01" y2="18" />
+                    </svg>
+                    ระบบมือถือหน้างาน
+                  </span>
+                </div>
+                <h1 className="text-md font-extrabold text-slate-900 mt-1">บริษัท ซีพีออลล์ จำกัด (มหาชน)</h1>
+                <h2 className="text-xs font-bold text-slate-600 mt-0.5 flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-green-600 mr-1.5 w-3 h-3">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                    <polyline points="10 9 9 9 8 9"></polyline>
+                  </svg>
+                  Check Sheet การบำรุงรักษาเครื่องจักร/อุปกรณ์
+                </h2>
+                
+                <div className="grid grid-cols-3 gap-1 mt-2.5 pt-2 border-t border-slate-100 text-[10px] text-slate-500 font-semibold">
+                  <div>รหัส: <span className="text-slate-800 font-bold">B3-FM-10-01-06</span></div>
+                  <div className="text-center">ปรับปรุงครั้งที่: <span className="text-slate-800 font-bold">0</span></div>
+                  <div className="text-right">ประกาศใช้: <span className="text-slate-800 font-bold">1 เม.ย. 2560</span></div>
+                </div>
+              </div>
+            </header>
+
+            {/* ส่วนแสดงผลหลัก (Main Content) */}
+            <main className="p-4 space-y-4 animate-fadeIn">
+              
+              {alertMsg && (
+                <div className={`p-4 rounded-2xl text-xs font-bold text-center border-2 ${submitStatus === 'success' ? 'bg-green-100 border-green-400 text-green-800' : 'bg-red-100 border-red-400 text-red-800'}`}>
+                  {alertMsg}
+                </div>
+              )}
+
+              <form onSubmit={handleFormSubmit} className="space-y-4">
+                
+                {/* ข้อมูลประจำจุด PM ทั่วไป */}
+                <section className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100 space-y-3 text-xs">
+                  <div className="flex items-center text-green-700 font-bold border-b pb-2 text-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-3.5 h-3.5 mr-2">
+                      <circle cx="12" cy="12" r="3" />
+                      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                    </svg>
+                    <span>ข้อมูลงานตรวจเช็คหลัก</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    <div>
+                      <span className="text-slate-400 font-semibold">เครื่องจักร/อุปกรณ์</span>
+                      <p className="font-bold text-slate-800 mt-1 px-3 py-2 bg-slate-50 rounded-xl border border-slate-100 truncate">Emergency Light</p>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 font-semibold">ความถี่แผนงาน</span>
+                      <p className="font-bold text-slate-800 mt-1 px-3 py-2 bg-slate-50 rounded-xl border border-slate-100">รอบประจำเดือน</p>
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-xs text-slate-400 font-semibold">สถานที่ปฏิบัติการ</span>
+                    <p className="font-bold text-xs text-slate-800 mt-1 px-3 py-2 bg-slate-50 rounded-xl border border-slate-100 flex items-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-red-500 mr-2 w-3 h-3 shrink-0">
+                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                        <circle cx="12" cy="10" r="3" />
+                      </svg>
+                      ศูนย์กระจายสินค้า DC
+                    </p>
+                  </div>
+                </section>
+
+                {/* ข้อมูลวันที่ 1 */}
+                <section className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 space-y-3 text-xs">
+                  <div className="font-bold text-green-700 flex items-center space-x-1 text-xs">
+                    <span>📅 ช่องบันทึกการทำงาน (วันที่ 1)</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="font-bold text-slate-400">วันที่ทำ PM 1</label>
+                      <input type="date" name="pmDate1" value={formData.pmDate1} onChange={handleInputChange} className="w-full mt-1 p-2 border rounded-xl bg-slate-50/50" />
+                    </div>
+                    <div>
+                      <label className="font-bold text-slate-400">ผู้มอบหมายงาน</label>
+                      <input list="assigners" name="assigner" value={formData.assigner} onChange={handleInputChange} className="w-full mt-1 p-2 border rounded-xl bg-slate-50/50 font-bold" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="font-bold text-slate-400">เวลาเริ่ม 1</label>
+                      <input type="time" name="startTime1" value={formData.startTime1} onChange={handleInputChange} className="w-full mt-1 p-2 border rounded-xl bg-slate-50/50" />
+                    </div>
+                    <div>
+                      <label className="font-bold text-slate-400">เวลาสิ้นสุด 1</label>
+                      <input type="time" name="endTime1" value={formData.endTime1} onChange={handleInputChange} className="w-full mt-1 p-2 border rounded-xl bg-slate-50/50" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="font-bold text-slate-400">รายชื่อช่างปฏิบัติงาน วันที่ 1 (ระบุสูงสุด 4 คน)</label>
+                    <div className="grid grid-cols-2 gap-2 mt-1">
+                      {[1,2,3,4].map(n => (
+                        <input key={n} list="operators" name={`operator1_${n}`} value={formData[`operator1_${n}`]} onChange={handleInputChange} placeholder={`ช่างคนที่ ${n}`} className="p-2 border rounded-xl text-xs bg-slate-50/50 font-semibold" />
+                      ))}
+                    </div>
+                  </div>
+                </section>
+
+                {/* ข้อมูลวันที่ 2 */}
+                <section className="bg-indigo-50/20 p-5 rounded-3xl border border-indigo-100 space-y-3 text-xs">
+                  <div className="font-bold text-indigo-700">📅 ช่องบันทึกเพิ่มเติม (วันที่ 2)</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="font-bold text-indigo-400">วันที่ทำ PM 2</label>
+                      <input type="date" name="pmDate2" value={formData.pmDate2} onChange={handleInputChange} className="w-full mt-1 p-2 border bg-white rounded-xl" />
+                    </div>
+                    <div>
+                      <label className="font-bold text-indigo-400">เวลาเริ่ม 2</label>
+                      <input type="time" name="startTime2" value={formData.startTime2} onChange={handleInputChange} className="w-full mt-1 p-2 border bg-white rounded-xl" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="font-bold text-indigo-400">เวลาสิ้นสุด 2</label>
+                      <input type="time" name="endTime2" value={formData.endTime2} onChange={handleInputChange} className="w-full mt-1 p-2 border bg-white rounded-xl" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="font-bold text-indigo-400">รายชื่อช่างปฏิบัติงาน วันที่ 2</label>
+                    <div className="grid grid-cols-2 gap-2 mt-1">
+                      {[1,2,3,4].map(n => (
+                        <input key={n} list="operators" name={`operator2_${n}`} value={formData[`operator2_${n}`]} onChange={handleInputChange} placeholder={`ช่างวันที่สองคนที่ ${n}`} className="p-2 border bg-white rounded-xl text-xs font-semibold" />
+                      ))}
+                    </div>
+                  </div>
+                </section>
+
+                {/* ตัวกรองปุ่มด้านบนตาราง */}
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center text-xs font-bold">
+                    <span className="text-slate-400 uppercase">ตารางไฟฉุกเฉิน ({filteredLamps.length} ตัว)</span>
+                    <button type="button" onClick={openManagementModal} className="text-teal-600 hover:underline">🔧 แก้ไขชื่อสถานที่</button>
+                  </div>
+                  <input type="text" placeholder="🔍 ค้นหารหัส หรือสถานที่..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full p-2.5 bg-white border rounded-xl text-xs outline-none shadow-xs" />
+                  <div className="flex bg-slate-200 p-0.5 rounded-xl text-[10px] font-bold text-center">
+                    {["ทั้งหมด", "ปกติ", "ไม่ปกติ"].map(st => (
+                      <button key={st} type="button" onClick={() => setFilterStatus(st)} className={`flex-1 py-1.5 rounded-lg ${filterStatus === st ? "bg-white text-slate-800 shadow-xs" : "text-slate-500"}`}>{st}</button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* รายการตรวจสอบ 90 ตัว */}
+                <section className="space-y-2 max-h-[380px] overflow-y-auto no-scrollbar pr-0.5 pb-2">
+                  {filteredLamps.map((lamp) => (
+                    <div key={lamp.id} className="bg-white p-3 rounded-xl border border-slate-100 space-y-2 shadow-xs">
+                      <div className="flex justify-between text-xs font-bold">
+                        <span className="text-green-700 bg-green-50 px-2 py-0.5 rounded">{lamp.id}</span>
+                        <span className="text-slate-500 truncate max-w-[240px]">📍 {lamp.location}</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-1">
+                        <button type="button" onClick={() => changeLampStatus(lamp.id, "ปกติ")} className={`py-1.5 border text-[10px] font-bold rounded-lg ${lamp.status === "ปกติ" ? 'bg-green-600 text-white border-green-600' : 'bg-slate-50 text-slate-600'}`}>🟢 ปกติ</button>
+                        <button type="button" onClick={() => changeLampStatus(lamp.id, "ไม่ปกติ")} className={`py-1.5 border text-[10px] font-bold rounded-lg ${(lamp.status === "ไม่ปกติ" && lamp.testResult !== "ไม่ผ่าน") ? 'bg-red-500 text-white border-red-500' : (lamp.status === "ไม่ปกติ" && lamp.testResult === "ไม่ผ่าน") ? 'bg-amber-600 text-white border-amber-600' : 'bg-slate-50 text-slate-600'}`}>
+                          {lamp.testResult === "ไม่ผ่าน" ? "🔴 เทสไม่ผ่าน" : "🔴 ไม่ปกติ"}
+                        </button>
+                        <button type="button" onClick={() => changeLampStatus(lamp.id, "ใช้รีโมทเทส 30 นาที")} className={`py-1.5 border text-[10px] font-bold rounded-lg ${(lamp.status === "ใช้รีโมทเทส 30 นาที" || lamp.testResult === "ไม่ผ่าน") ? 'bg-blue-600 text-white border-blue-600' : 'bg-slate-50 text-slate-600'}`}>⚡ รีโมท 30น.</button>
+                      </div>
+
+                      {/* แผงควบคุมกรณีเลือก รีโมทเทส 30 นาที */}
+                      {(lamp.status === "ใช้รีโมทเทส 30 นาที" || lamp.testResult === "ไม่ผ่าน") && (
+                        <div className="flex items-center justify-between bg-blue-50 border border-blue-200 p-2 rounded-xl mt-1">
+                          <span className="text-[10px] font-bold text-blue-800">📊 ผลการเทสรีโมท:</span>
+                          <div className="flex space-x-1 w-2/3">
+                            <button type="button" onClick={() => changeTestResult(lamp.id, "ผ่าน")} className={`flex-1 py-1 text-[10px] font-extrabold rounded-md border ${lamp.testResult === "ผ่าน" ? "bg-emerald-600 text-white" : "bg-white text-slate-500"}`}>✅ ผ่าน</button>
+                            <button type="button" onClick={() => changeTestResult(lamp.id, "ไม่ผ่าน")} className={`flex-1 py-1 text-[10px] font-extrabold rounded-md border ${lamp.testResult === "ไม่ผ่าน" ? "bg-rose-600 text-white" : "bg-white text-slate-500"}`}>❌ ไม่ผ่าน</button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </section>
+
+                {/* ผลสรุปภาพรวม */}
+                <section className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 space-y-3 text-xs">
+                  <div className="font-bold text-slate-400 uppercase">📌 สรุปผลการ PM ภาพรวม</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button type="button" onClick={() => setFormData(p => ({ ...p, overallStatus: "ปกติ" }))} className={`p-2.5 rounded-xl border font-bold text-center ${formData.overallStatus === "ปกติ" ? "bg-green-600 text-white" : "bg-white"}`}>🟢 ปกติ</button>
+                    <button type="button" onClick={() => setFormData(p => ({ ...p, overallStatus: "ไม่ปกติ" }))} className={`p-2.5 rounded-xl border font-bold text-center ${formData.overallStatus === "ไม่ปกติ" ? "bg-red-500 text-white" : "bg-white"}`}>🔴 ไม่ปกติ</button>
+                  </div>
+                  <textarea name="summaryText" value={formData.summaryText} onChange={handleInputChange} rows="2" placeholder="พิมพ์รายงานเพิ่มเติม..." className="w-full p-2.5 border rounded-xl outline-none text-xs" />
+                </section>
+
+                <div className="bg-white p-3 rounded-3xl shadow-sm border border-slate-100">
+                  <button type="submit" disabled={isSubmitting} className="w-full py-3.5 bg-green-600 hover:bg-green-700 text-white text-xs font-bold rounded-xl shadow-md transition-all active:scale-95">
+                    {isSubmitting ? "🚀 กำลังส่งประวัติเข้าคลาวด์แผ่นงาน..." : "💾 ยืนยันส่งรายงานเข้า Google Sheets"}
+                  </button>
+                </div>
+              </form>
+            </main>
+          </div>
+
+          {/* ฟุตเตอร์ */}
+          <footer className="text-center text-[10px] text-slate-400 font-medium my-4">
+            <p>© 2026 CP ALL DC MAHACHAI ENGINEERING DEPARTMENT</p>
+          </footer>
+
+          {/* หน้าต่างจัดการพิกัดตำแหน่งหลอดไฟ (เพิ่มปุ่ม บวก/ลบ รายการกลับคืนมา) */}
+          {isManageModalOpen && (
+            <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-end justify-center">
+              <div className="bg-white w-full max-w-md rounded-t-3xl p-4 flex flex-col max-h-[80vh] shadow-xl">
+                <div className="flex justify-between items-center pb-2 border-b">
+                  <div className="flex items-center space-x-2">
+                    <h3 className="text-xs font-bold text-slate-700">🔧 จัดการพิกัดตำแหน่งหลอดไฟ</h3>
+                    <span className="text-[10px] bg-slate-100 text-slate-600 font-bold px-2 py-0.5 rounded-full">ทั้งหมด {editableLamps.length} ตัว</span>
+                  </div>
+                  <button type="button" onClick={() => setIsManageModalOpen(false)} className="text-xs font-bold text-slate-400 hover:text-slate-600 p-1">ปิด</button>
+                </div>
+                
+                {/* ปุ่มเพิ่มรายการใหม่ */}
+                <div className="pt-2">
+                  <button type="button" onClick={handleAddItem} className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] rounded-xl flex items-center justify-center space-x-1 border border-dashed border-slate-300">
+                    <span>➕ เพิ่มหลอดไฟใหม่ต่อท้ายแผ่นงาน</span>
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto py-2 space-y-2 no-scrollbar mt-1">
+                  {editableLamps.map((lamp, i) => (
+                    <div key={lamp.id} className="flex items-center space-x-2 bg-slate-50 p-1.5 rounded-xl border border-slate-100">
+                      <input type="text" value={lamp.id} onChange={(e) => {
+                        const targetId = e.target.value;
+                        setEditableLamps(prev => prev.map(item => item.id === lamp.id ? { ...item, id: targetId } : item))
+                      }} className="text-[11px] font-bold text-slate-700 w-16 text-center border bg-white rounded-lg p-1" />
+                      
+                      <input type="text" value={lamp.location} placeholder="ระบุตำแหน่ง/พื้นที่ติดตั้ง..." onChange={(e) => {
+                        const targetVal = e.target.value;
+                        setEditableLamps(prev => prev.map(item => item.id === lamp.id ? { ...item, location: targetVal } : item))
+                      }} className="flex-1 p-1.5 border bg-white rounded-lg text-xs font-semibold" />
+                      
+                      {/* ปุ่มลบรายการออกจากโครงสร้าง */}
+                      <button type="button" onClick={() => handleRemoveItem(lamp.id)} className="p-1.5 text-slate-400 hover:text-red-500 rounded-lg transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2.5" stroke="currentColor" className="w-4 h-4">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                
+                <div className="pt-2 border-t mt-1 flex space-x-2">
+                  <button type="button" onClick={() => setIsManageModalOpen(false)} className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold rounded-xl">ยกเลิก</button>
+                  <button type="button" onClick={saveManagementChanges} className="flex-1 py-2.5 bg-green-600 hover:bg-green-700 text-white text-xs font-bold rounded-xl shadow-xs">💾 บันทึกโครงสร้างใหม่</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <datalist id="assigners">{assignerList.map((n, i) => <option key={i} value={n} />)}</datalist>
+          <datalist id="operators">{operatorList.map((n, i) => <option key={i} value={n} />)}</datalist>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
