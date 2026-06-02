@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Check Sheet PM - Supply Pump System</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Anuphan:wght@300;400;500;600;700&display=swap');
+    body {
+      font-family: 'Anuphan', sans-serif;
+    }
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fadeIn {
+      animation: fadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen pb-12">
+
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo } = React;
+
+    // 🔴 ใส่ลิงก์ Web App ของคุณที่ได้จากขั้นตอนการ Deploy ใน Google Apps Script
+    const GOOGLE_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbziJifvWM6o8GfQnsRBns9U7PjQK9i8oDITvkXgVV-OlQNWyxuKnkiaMf2VCcseUPq7/exec";
+
+    // รายชื่ออุปกรณ์ปั๊มน้ำเริ่มต้น 2 ตัว
+    const initialPumpsData = [
+      { id: "PUMP-01", name: "Supply Pump ตัวที่ 1" },
+      { id: "PUMP-02", name: "Supply Pump ตัวที่ 2" }
+    ];
+
+    // รายการตรวจสอบประจำดวง/ตัว (ลำดับที่ 2-11)
+    const checkItemsTemplate = [
+      { key: "chk_magnetic", label: "2. ตรวจเช็คสภาพชุดแม็กเนติก", status: "ปกติ" },
+      { key: "chk_wiring", label: "3. ตรวจเช็คสภาพสายไฟต่างๆ", status: "ปกติ" },
+      { key: "chk_gauge", label: "4. ตรวจเช็คเกจวัดแรงดัน", status: "ปกติ" },
+      { key: "chk_pipe", label: "5. ตรวจเช็คสภาพท่อน้ำ", status: "ปกติ" },
+      { key: "chk_sound", label: "6. ตรวจเช็คเสียงจากการทำงานของ Motor", status: "ปกติ" },
+      { key: "chk_structure", label: "7. ตรวจเช็คโครงสร้าง", status: "ปกติ" },
+      { key: "chk_transmitter", label: "8. ตรวจเช็คสภาพ TRANSMITTER", status: "ปกติ" },
+      { key: "chk_tank", label: "9. ตรวจเช็คสภาพถังแชมเปญ", status: "ปกติ" },
+      { key: "chk_bolts", label: "10. ขันน็อตยึดท่อและมอเตอร์ทุกตัว", status: "ปกติ" },
+      { key: "chk_box", label: "11. เปิดฝา box ตรวจสอบน็อตยึดสายไฟฟ้าของมอเตอร์", status: "ปกติ" }
+    ];
+
+    function App() {
+      const assignerList = ["เกรียงศักดิ์", "ณรงค์", "รัฐชานนท์"];
+      const operatorList = ["ณรงค์", "รัฐชานนท์", "บัญชา", "วสุพล", "ศรายุทธ", "พิพัฒน์", "ศรราม เอี่ยมอาจ", "วงศธร", "เกรียงศักดิ์"];
+      const todayStr = new Date().toISOString().split('T')[0];
+
+      // Form Metadata
+      const [formData, setFormData] = useState({
+        assigner: "เกรียงศักดิ์", pmDate1: todayStr, startTime1: "", endTime1: "",
+        operator1_1: "", operator1_2: "", operator1_3: "", operator1_4: "",
+        /* คอมเมนต์ซ่อนค่าฟิลด์วันที่ 2
+        pmDate2: "", startTime2: "", endTime2: "",
+        operator2_1: "", operator2_2: "", operator2_3: "", operator2_4: "",
+        */
+        summaryText: "", overallStatus: "ปกติ"
+      });
+
+      // ดึง/บันทึกโครงสร้างรายชื่อปั๊มจาก LocalStorage
+      const [pumps, setPumps] = useState(() => {
+        const saved = localStorage.getItem("pm_supply_pumps_v1");
+        return saved ? JSON.parse(saved) : initialPumpsData;
+      });
+
+      // จัดเก็บผลการตรวจสอบแยกตามไอดีของปั๊มน้ำ
+      const [checkResults, setCheckResults] = useState({});
+
+      const [isManageModalOpen, setIsManageModalOpen] = useState(false);
+      const [editablePumps, setEditablePumps] = useState([]);
+      const [isSubmitting, setIsSubmitting] = useState(false);
+      const [alertMsg, setAlertMsg] = useState("");
+      const [submitStatus, setSubmitStatus] = useState(null);
+
+      useEffect(() => {
+        localStorage.setItem("pm_supply_pumps_v1", JSON.stringify(pumps));
+      }, [pumps]);
+
+      // Initialize ผลการตรวจเช็คเริ่มต้น (ปรับให้แรงดันและกระแสไฟฟ้าเป็นค่าว่างเพื่อให้ placeholder ทำงาน)
+      useEffect(() => {
+        setCheckResults(prev => {
+          const updated = { ...prev };
+          pumps.forEach(p => {
+            if (!updated[p.id]) {
+              updated[p.id] = {
+                v_l1_l2: "", v_l1_l3: "", v_l2_l3: "",
+                i_1: "", i_2: "", i_3: "",
+                checks: checkItemsTemplate.map(item => ({ ...item }))
+              };
+            }
+          });
+          return updated;
+        });
+      }, [pumps]);
+
+      const handleInputChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value }));
+      };
+
+      // ฟังก์ชันเปลี่ยนค่าทางไฟฟ้า (V, A)
+      const handleElectricValueChange = (pumpId, field, value) => {
+        setCheckResults(prev => ({
+          ...prev,
+          [pumpId]: {
+            ...prev[pumpId],
+            [field]: value
+          }
+        }));
+      };
+
+      // ฟังก์ชันเปลี่ยนสถานะข้อ 2 - 11
+      const handleCheckStatusChange = (pumpId, checkKey, newStatus) => {
+        setCheckResults(prev => {
+          const pumpData = prev[pumpId];
+          const updatedChecks = pumpData.checks.map(c => 
+            c.key === checkKey ? { ...c, status: newStatus } : c
+          );
+          return {
+            ...prev,
+            [pumpId]: { ...pumpData, checks: updatedChecks }
+          };
+        });
+      };
+
+      // ฟังก์ชันตรวจสอบความผิดปกติทางไฟฟ้าเพื่อเตือน UI สีแดง
+      const isElectricalAlert = (field, val) => {
+        const num = parseFloat(val);
+        if (isNaN(num)) return false;
+        if (field.startsWith('v_')) {
+          return num < 380 || num > 420; // แรงดันต้องอยู่ระหว่าง 380V - 420V
+        }
+        if (field.startsWith('i_')) {
+          return num >= 12; // กระแสไฟฟ้าต้องน้อยกว่า 12A
+        }
+        return false;
+      };
+
+      const openManagementModal = () => {
+        setEditablePumps([...pumps]);
+        setIsManageModalOpen(true);
+      };
+
+      const handleAddPump = () => {
+        const nextNum = editablePumps.length + 1;
+        const newId = `PUMP-${nextNum.toString().padStart(2, '0')}`;
+        setEditablePumps([...editablePumps, { id: newId, name: `Supply Pump ตัวที่ ${nextNum}` }]);
+      };
+
+      const handleRemovePump = (id) => {
+        setEditablePumps(editablePumps.filter(p => p.id !== id));
+      };
+
+      const saveManagementChanges = () => {
+        setPumps(editablePumps);
+        setIsManageModalOpen(false);
+      };
+
+      const handleFormSubmit = async (e) => {
+        e.preventDefault();
+        setAlertMsg("");
+        setSubmitStatus(null);
+
+        if (!formData.startTime1 || !formData.endTime1 || !formData.operator1_1) {
+          setAlertMsg("⚠️ กรุณากรอกเวลาทำงาน และผู้ปฏิบัติงานหลัก (วันที่ 1) ให้ครบถ้วน");
+          window.scrollTo({ top: 0, behavior: "smooth" });
+          return;
+        }
+
+        setIsSubmitting(true);
+
+        try {
+          const postData = { ...formData, pumps, checkResults };
+          await fetch(GOOGLE_WEB_APP_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({ data: JSON.stringify(postData) })
+          });
+
+          setSubmitStatus('success');
+          setAlertMsg("🎉 บันทึกข้อมูลและจัดส่งเข้าฐานข้อมูลระบบ Supply Pump เรียบร้อยแล้ว!");
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        } catch (err) {
+          setSubmitStatus('error');
+          setAlertMsg("❌ ส่งข้อมูลไม่สำเร็จ โปรดตรวจสอบสัญญาณเครือข่ายอินเทอร์เน็ต");
+        } finally {
+          setIsSubmitting(false);
+        }
+      };
+
+      return (
+        <div className="max-w-md mx-auto min-h-screen flex flex-col justify-between">
+          <div>
+            {/* Header คลีนพรีเมียม สเปก CP ALL */}
+            <header className="bg-white shadow-sm border-b-4 border-green-600 sticky top-0 z-30">
+              <div className="p-4">
+                <div className="flex items-center justify-between">
+                  <span className="bg-green-600 text-white text-[10px] font-black px-2 py-0.5 rounded">CP ALL</span>
+                  <span className="text-[10px] text-slate-400 font-bold flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-3 h-3 mr-1 text-slate-400">
+                      <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
+                      <line x1="12" y1="18" x2="12.01" y2="18" />
+                    </svg>
+                    ระบบมือถือหน้างาน
+                  </span>
+                </div>
+                <h1 className="text-md font-extrabold text-slate-900 mt-1">บริษัท ซีพีออลล์ จำกัด (มหาชน)</h1>
+                <h2 className="text-xs font-bold text-slate-600 mt-0.5 flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-green-600 mr-1.5 w-3 h-3">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                  </svg>
+                  Check Sheet การบำรุงรักษาอุปกรณ์
+                </h2>
+                <div className="grid grid-cols-3 gap-1 mt-2.5 pt-2 border-t border-slate-100 text-[10px] text-slate-500 font-semibold">
+                  <div>รหัส: <span className="text-slate-800 font-bold">B3-FM-10-01-06</span></div>
+                  <div className="text-center">ปรับปรุงครั้งที่: <span className="text-slate-800 font-bold">0</span></div>
+                  <div className="text-right">ประกาศใช้: <span className="text-slate-800 font-bold">1 เม.ย. 2560</span></div>
+                </div>
+              </div>
+            </header>
+
+            {/* ส่วนแสดงผลหลัก */}
+            <main className="p-4 space-y-4 animate-fadeIn">
+              {alertMsg && (
+                <div className={`p-4 rounded-2xl text-xs font-bold text-center border-2 ${submitStatus === 'success' ? 'bg-green-100 border-green-400 text-green-800' : 'bg-red-100 border-red-400 text-red-800'}`}>
+                  {alertMsg}
+                </div>
+              )}
+
+              <form onSubmit={handleFormSubmit} className="space-y-4">
+                {/* ข้อมูลประจำจุด PM ทั่วไป */}
+                <section className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100 space-y-3 text-xs">
+                  <div className="flex items-center text-green-700 font-bold border-b pb-2 text-sm">
+                    <span>📊 ข้อมูลงานตรวจเช็คหลัก</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    <div>
+                      <span className="text-slate-400 font-semibold">เครื่องจักร/อุปกรณ์</span>
+                      <p className="font-bold text-slate-800 mt-1 px-3 py-2 bg-slate-50 rounded-xl border border-slate-100 truncate">Supply Pump System</p>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 font-semibold">ความถี่แผนงาน</span>
+                      <p className="font-bold text-slate-800 mt-1 px-3 py-2 bg-slate-50 rounded-xl border border-slate-100">รอบประจำเดือน</p>
+                    </div>
+                  </div>
+
+		<div>
+                    <span className="text-xs text-slate-400 font-semibold">สถานที่ปฏิบัติการ</span>
+                    <p className="font-bold text-xs text-slate-800 mt-1 px-3 py-2 bg-slate-50 rounded-xl border border-slate-100 flex items-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-red-500 mr-2 w-3 h-3 shrink-0">
+                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                        <circle cx="12" cy="10" r="3" />
+                      </svg>
+                      ห้อง Fire Pump
+                    </p>
+                  </div>
+
+                </section>
+
+                {/* ข้อมูลการทำงานวันที่ 1 */}
+                <section className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 space-y-3 text-xs">
+                  <div className="font-bold text-green-700">📅 บันทึกการทำงาน (วันที่ 1)</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="font-bold text-slate-400">วันที่ทำ PM 1</label>
+                      <input type="date" name="pmDate1" value={formData.pmDate1} onChange={handleInputChange} className="w-full mt-1 p-2 border rounded-xl bg-slate-50/50" />
+                    </div>
+                    <div>
+                      <label className="font-bold text-slate-400">ผู้มอบหมายงาน</label>
+                      <input list="assigners" name="assigner" value={formData.assigner} onChange={handleInputChange} className="w-full mt-1 p-2 border rounded-xl bg-slate-50/50 font-bold" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="font-bold text-slate-400">เวลาเริ่ม 1</label>
+                      <input type="time" name="startTime1" value={formData.startTime1} onChange={handleInputChange} className="w-full mt-1 p-2 border rounded-xl bg-slate-50/50" />
+                    </div>
+                    <div>
+                      <label className="font-bold text-slate-400">เวลาสิ้นสุด 1</label>
+                      <input type="time" name="endTime1" value={formData.endTime1} onChange={handleInputChange} className="w-full mt-1 p-2 border rounded-xl bg-slate-50/50" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="font-bold text-slate-400">รายชื่อช่างปฏิบัติงาน วันที่ 1</label>
+                    <div className="grid grid-cols-2 gap-2 mt-1">
+                      {[1,2,3,4].map(n => (
+                        <input key={n} list="operators" name={`operator1_${n}`} value={formData[`operator1_${n}`]} onChange={handleInputChange} placeholder={`ช่างคนที่ ${n}`} className="p-2 border rounded-xl text-xs bg-slate-50/50 font-semibold" />
+                      ))}
+                    </div>
+                  </div>
+                </section>
+
+                {/* แผงควบคุมรายชื่อปั๊ม */}
+                <div className="flex justify-between items-center text-xs font-bold pt-2">
+                  <span className="text-slate-400 uppercase">รายการตรวจสอบระบบปั๊ม ({pumps.length} ตัว)</span>
+                  <button type="button" onClick={openManagementModal} className="text-teal-600 hover:underline">🔧 แก้ไขโครงสร้างปั๊ม</button>
+                </div>
+
+                {/* ลูปแสดงฟอร์มตรวจสอบของปั๊มน้ำแต่ละตัว */}
+                {pumps.map((pump) => {
+                  const data = checkResults[pump.id] || { v_l1_l2: "", v_l1_l3: "", v_l2_l3: "", i_1: "", i_2: "", i_3: "", checks: [] };
+                  return (
+                    <section key={pump.id} className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm space-y-4">
+                      <div className="flex items-center justify-between border-b pb-2">
+                        <span className="bg-green-100 text-green-800 text-xs font-bold px-2.5 py-1 rounded-lg">{pump.id}</span>
+                        <span className="text-xs font-bold text-slate-800">{pump.name}</span>
+                      </div>
+
+                      {/* ลำดับที่ 1: ตรวจสอบสภาพแรงดัน และกระแสไฟฟ้า */}
+                      <div className="space-y-3 bg-slate-50 p-3 rounded-2xl border border-slate-200 text-[11px]">
+                        <div className="font-bold text-slate-700 flex justify-between">
+                          <span>⚡ 1. ตรวจสอบสภาพแรงดัน และกระแสไฟฟ้า</span>
+                        </div>
+                        
+                        {/* ส่วนป้อนแรงดันไฟฟ้า -> ใส่ placeholder="380" เป็นตัวซีด */}
+                        <div className="space-y-1">
+                          <span className="text-[10px] text-slate-400 font-bold block">แรงดันไฟฟ้า (มาตรฐาน 380V - 420V)</span>
+                          <div className="grid grid-cols-3 gap-2">
+                            {["v_l1_l2", "v_l1_l3", "v_l2_l3"].map((field) => (
+                              <div key={field}>
+                                <label className="text-[9px] text-slate-400 font-bold">{field.replace("v_", "").toUpperCase().replace("_", "-")}</label>
+                                <input type="number" step="any" placeholder="380" value={data[field]} onChange={(e) => handleElectricValueChange(pump.id, field, e.target.value)} className={`w-full p-1.5 border rounded-lg text-center font-bold text-xs ${isElectricalAlert(field, data[field]) ? "bg-red-50 border-red-400 text-red-600 animate-pulse" : "bg-white"}`} />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* ส่วนป้อนกระแสไฟฟ้า -> ใส่ placeholder="0" เป็นตัวซีด */}
+                        <div className="space-y-1 pt-1">
+                          <span className="text-[10px] text-slate-400 font-bold block">กระแสไฟฟ้า (มาตรฐาน &lt; 12A)</span>
+                          <div className="grid grid-cols-3 gap-2">
+                            {["i_1", "i_2", "i_3"].map((field, idx) => (
+                              <div key={field}>
+                                <label className="text-[9px] text-slate-400 font-bold">I{idx+1} (A)</label>
+                                <input type="number" step="any" placeholder="0" value={data[field]} onChange={(e) => handleElectricValueChange(pump.id, field, e.target.value)} className={`w-full p-1.5 border rounded-lg text-center font-bold text-xs ${isElectricalAlert(field, data[field]) ? "bg-red-50 border-red-400 text-red-600 animate-pulse" : "bg-white"}`} />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* ลำดับที่ 2 - 11: รายการเช็คผ่านปุ่มกดแบบ Premium UI */}
+                      <div className="space-y-2">
+                        <span className="text-[10px] text-slate-400 font-bold block uppercase">🛠️ รายการตรวจเช็คทางกายภาพ</span>
+                        {data.checks.map((item) => (
+                          <div key={item.key} className="flex flex-col p-2.5 bg-slate-50/60 border rounded-xl space-y-1.5">
+                            <span className="text-[11px] font-bold text-slate-700 leading-tight">{item.label}</span>
+                            <div className="flex space-x-1">
+                              <button type="button" onClick={() => handleCheckStatusChange(pump.id, item.key, "ปกติ")} className={`flex-1 py-1 rounded-md text-[10px] font-extrabold border transition-all ${item.status === "ปกติ" ? "bg-green-600 text-white border-green-600 shadow-xs" : "bg-white text-slate-400"}`}>🟢 ปกติ</button>
+                              <button type="button" onClick={() => handleCheckStatusChange(pump.id, item.key, "ไม่ปกติ")} className={`flex-1 py-1 rounded-md text-[10px] font-extrabold border transition-all ${item.status === "ไม่ปกติ" ? "bg-red-500 text-white border-red-500 shadow-xs" : "bg-white text-slate-400"}`}>🔴 ไม่ปกติ</button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                  );
+                })}
+
+                {/* ผลสรุปภาพรวมและปุ่มส่งข้อมูล */}
+                <section className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 space-y-3 text-xs">
+                  <div className="font-bold text-slate-400 uppercase">📌 สรุปผลการ PM ภาพรวมระบบ</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button type="button" onClick={() => setFormData(p => ({ ...p, overallStatus: "ปกติ" }))} className={`p-2.5 rounded-xl border font-bold text-center ${formData.overallStatus === "ปกติ" ? "bg-green-600 text-white" : "bg-white"}`}>🟢 ปกติ</button>
+                    <button type="button" onClick={() => setFormData(p => ({ ...p, overallStatus: "ไม่ปกติ" }))} className={`p-2.5 rounded-xl border font-bold text-center ${formData.overallStatus === "ไม่ปกติ" ? "bg-red-500 text-white" : "bg-white"}`}>🔴 ไม่ปกติ</button>
+                  </div>
+                  <textarea name="summaryText" value={formData.summaryText} onChange={handleInputChange} rows="2" placeholder="พิมพ์ข้อความสรุปงานหรือข้อเสนอแนะเพิ่มเติม..." className="w-full p-2.5 border rounded-xl outline-none text-xs" />
+                </section>
+
+                <div className="bg-white p-3 rounded-3xl shadow-sm border border-slate-100">
+                  <button type="submit" disabled={isSubmitting} className="w-full py-3.5 bg-green-600 hover:bg-green-700 text-white text-xs font-bold rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center">
+                    {isSubmitting ? "🚀 กำลังอัปโหลดประวัติเข้า Google Sheets..." : "💾 ยืนยันส่งรายงาน Supply Pump PM"}
+                  </button>
+                </div>
+              </form>
+            </main>
+          </div>
+
+          <footer className="text-center text-[10px] text-slate-400 font-medium my-4">
+            <p>© 2026 CP ALL DC MAHACHAI ENGINEERING DEPARTMENT</p>
+          </footer>
+
+          {/* หน้าต่างจัดการพิกัด/รายชื่อปั๊มน้ำหน้างาน */}
+          {isManageModalOpen && (
+            <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-end justify-center">
+              <div className="bg-white w-full max-w-md rounded-t-3xl p-4 flex flex-col max-h-[80vh] shadow-xl">
+                <div className="flex justify-between items-center pb-2 border-b">
+                  <h3 className="text-xs font-bold text-slate-700">🔧 จัดการรายการอุปกรณ์ Supply Pump</h3>
+                  <button type="button" onClick={() => setIsManageModalOpen(false)} className="text-xs font-bold text-slate-400 hover:text-slate-600">ปิด</button>
+                </div>
+                
+                <div className="pt-2">
+                  <button type="button" onClick={handleAddPump} className="w-full py-2 bg-slate-100 text-slate-700 font-bold text-[11px] rounded-xl flex items-center justify-center border border-dashed border-slate-300">
+                    <span>➕ เพิ่มเครื่องสูบน้ำใหม่</span>
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto py-2 space-y-2 no-scrollbar">
+                  {editablePumps.map((pump) => (
+                    <div key={pump.id} className="flex items-center space-x-2 bg-slate-50 p-1.5 rounded-xl border border-slate-100">
+                      <input type="text" value={pump.id} onChange={(e) => {
+                        const val = e.target.value;
+                        setEditablePumps(prev => prev.map(item => item.id === pump.id ? { ...item, id: val } : item))
+                      }} className="text-[11px] font-bold text-slate-700 w-16 text-center border bg-white rounded-lg p-1" />
+                      
+                      <input type="text" value={pump.name} onChange={(e) => {
+                        const val = e.target.value;
+                        setEditablePumps(prev => prev.map(item => item.id === pump.id ? { ...item, name: val } : item))
+                      }} className="flex-1 p-1.5 border bg-white rounded-lg text-xs font-semibold" />
+                      
+                      <button type="button" onClick={() => handleRemovePump(pump.id)} className="p-1.5 text-slate-400 hover:text-red-500 rounded-lg">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2.5" stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                
+                <div className="pt-2 border-t flex space-x-2">
+                  <button type="button" onClick={() => setIsManageModalOpen(false)} className="flex-1 py-2.5 bg-slate-100 text-slate-600 text-xs font-bold rounded-xl">ยกเลิก</button>
+                  <button type="button" onClick={saveManagementChanges} className="flex-1 py-2.5 bg-green-600 text-white text-xs font-bold rounded-xl shadow-xs">บันทึก</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <datalist id="assigners">{assignerList.map((n, i) => <option key={i} value={n} />)}</datalist>
+          <datalist id="operators">{operatorList.map((n, i) => <option key={i} value={n} />)}</datalist>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
