@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Check Sheet PM - Generator & MDB Room</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Anuphan:wght@300;400;500;600;700&display=swap');
+    body {
+      font-family: 'Anuphan', sans-serif;
+    }
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fadeIn {
+      animation: fadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen pb-12">
+
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    // 🔴 วาง URL ของ Web App ที่ได้จาก Google Apps Script ที่นี่หลังจากการ Deploy
+    const GOOGLE_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyeL5ygzvq-iooSBTlyh_9M6GKogQcicAa75md2TYWqqaI68hrx20fP7kKUnYC4ZWlF/exec";
+
+    // 💡 แยกหัวข้อการตรวจเช็คออกเป็น 3 ห้องตามคำขอ
+    const defaultChecklist = [
+      { id: "item-gen", text: "ทำความสะอาดและตรวจเช็คพื้นที่ ห้อง GEN", status: "ปกติ" },
+      { id: "item-mdb", text: "ทำความสะอาดและตรวจเช็คพื้นที่ ห้อง MDB", status: "ปกติ" },
+      { id: "item-oil", text: "ทำความสะอาดและตรวจเช็คพื้นที่ ห้องน้ำมัน GEN", status: "ปกติ" }
+    ];
+
+    function App() {
+      const assignerList = ["เกรียงศักดิ์", "ณรงค์", "รัฐชานนท์"];
+      const operatorList = ["ณรงค์", "รัฐชานนท์", "บัญชา", "วสุพล", "ศรายุทธ", "พิพัฒน์", "ศรราม เอี่ยมอาจ", "วงศธร", "เกรียงศักดิ์"];
+      const todayStr = new Date().toISOString().split('T')[0];
+
+      // ฟอร์ม State หลัก
+      const [formData, setFormData] = useState({
+        assigner: "เกรียงศักดิ์",
+        location: "อาคาร DC",
+        pmDate: todayStr,
+        startTime: "",
+        endTime: "",
+        operator1: "", operator2: "", operator3: "", operator4: "",
+        summaryText: "",
+        overallStatus: "ปกติ",
+        signee: ""
+      });
+
+      // ระบบจดจำรายการตรวจเช็ค (ผู้ใช้ยังสามารถกดเพิ่มหัวข้อย่อยอื่นๆ เองได้ภายหลัง)
+      const [checklistItems, setChecklistItems] = useState(() => {
+        const saved = localStorage.getItem("pm_gen_mdb_split_checklist_v2");
+        return saved ? JSON.parse(saved) : defaultChecklist;
+      });
+
+      const [isManageModalOpen, setIsManageModalOpen] = useState(false);
+      const [newCheckItemText, setNewCheckItemText] = useState("");
+      const [isSubmitting, setIsSubmitting] = useState(false);
+      const [alertMsg, setAlertMsg] = useState("");
+      const [submitStatus, setSubmitStatus] = useState(null);
+
+      useEffect(() => {
+        localStorage.setItem("pm_gen_mdb_split_checklist_v2", JSON.stringify(checklistItems));
+      }, [checklistItems]);
+
+      const handleInputChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value }));
+      };
+
+      const handleStatusChange = (itemId, nextStatus) => {
+        setChecklistItems(prev => prev.map(item => 
+          item.id === itemId ? { ...item, status: nextStatus } : item
+        ));
+      };
+
+      // ฟังก์ชันเพิ่มรายการตรวจเช็คหน้างานภายหลัง
+      const handleAddCheckItem = (e) => {
+        e.preventDefault();
+        if (!newCheckItemText.trim()) return;
+        const newItem = {
+          id: `item-${Date.now()}`,
+          text: newCheckItemText.trim(),
+          status: "ปกติ"
+        };
+        setChecklistItems([...checklistItems, newItem]);
+        setNewCheckItemText("");
+      };
+
+      // ฟังก์ชันลบรายการตรวจสอบ
+      const handleRemoveCheckItem = (itemId) => {
+        setChecklistItems(checklistItems.filter(item => item.id !== itemId));
+      };
+
+      // ส่งข้อมูลเข้าสู่ระบบ Google Sheets
+      const handleFormSubmit = async (e) => {
+        e.preventDefault();
+        setAlertMsg("");
+        setSubmitStatus(null);
+
+        if (!formData.startTime || !formData.endTime || !formData.operator1 || !formData.signee) {
+          setAlertMsg("⚠️ กรุณากรอกเวลาทำงาน รายชื่อช่าง และลงชื่อผู้ปิดงานให้ครบถ้วน");
+          window.scrollTo({ top: 0, behavior: "smooth" });
+          return;
+        }
+
+        setIsSubmitting(true);
+
+        try {
+          const postData = { ...formData, checklistItems };
+          await fetch(GOOGLE_WEB_APP_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({ data: JSON.stringify(postData) })
+          });
+
+          setSubmitStatus('success');
+          setAlertMsg("🎉 บันทึกรายงานแยก 3 ห้องลง Google Sheet เรียบร้อยแล้ว!");
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        } catch (err) {
+          setSubmitStatus('error');
+          setAlertMsg("❌ ส่งข้อมูลไม่สำเร็จ โปรดตรวจสอบการเชื่อมต่อหรือ URL Web App ของคุณ");
+        } finally {
+          setIsSubmitting(false);
+        }
+      };
+
+      return (
+        <div className="max-w-md mx-auto min-h-screen flex flex-col justify-between">
+          <div>
+            {/* Header ส่วนหัวกระดาษคงเดิมตามสเปกกำหนด */}
+            <header className="bg-white shadow-sm border-b-4 border-green-600 sticky top-0 z-30">
+              <div className="p-4">
+                <div className="flex items-center justify-between">
+                  <span className="bg-green-600 text-white text-[10px] font-black px-2 py-0.5 rounded">CP ALL</span>
+                  <span className="text-[10px] text-slate-400 font-bold flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-3 h-3 mr-1 text-slate-400">
+                      <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
+                      <line x1="12" y1="18" x2="12.01" y2="18" />
+                    </svg>
+                    โมบายแอป v1.3 (แยกห้อง)
+                  </span>
+                </div>
+                <h1 className="text-md font-extrabold text-slate-900 mt-1">บริษัท ซีพีออลล์ จำกัด (มหาชน)</h1>
+                <h2 className="text-xs font-bold text-slate-600 mt-0.5 flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-green-600 mr-1.5 w-3 h-3">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                  </svg>
+                  Check Sheet การบำรุงรักษาเครื่องจักร/อุปกรณ์
+                </h2>
+                <div className="grid grid-cols-3 gap-1 mt-2.5 pt-2 border-t border-slate-100 text-[9px] text-slate-500 font-semibold">
+                  <div>รหัส: <span className="text-slate-800 font-bold">B3-FM-10-01-06</span></div>
+                  <div className="text-center">ปรับปรุงครั้งที่: <span className="text-slate-800 font-bold">0</span></div>
+                  <div className="text-right">ประกาศใช้: <span className="text-slate-800 font-bold">1 เม.ย. 2560</span></div>
+                </div>
+              </div>
+            </header>
+
+            {/* ส่วนเนื้อหาฟอร์ม */}
+            <main className="p-4 space-y-4 animate-fadeIn">
+              {alertMsg && (
+                <div className={`p-4 rounded-2xl text-xs font-bold text-center border-2 ${submitStatus === 'success' ? 'bg-green-100 border-green-400 text-green-800' : 'bg-red-100 border-red-400 text-red-800'}`}>
+                  {alertMsg}
+                </div>
+              )}
+
+              <form onSubmit={handleFormSubmit} className="space-y-4">
+                {/* รายละเอียดสถานที่และเวลา */}
+                <section className="bg-white rounded-3xl p-5 shadow-xs border border-slate-100 space-y-3 text-xs">
+                  <div className="flex items-center text-green-700 font-bold border-b pb-2 text-sm">
+                    <span>📊 รายละเอียดแผนงาน PM</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    <div className="col-span-2">
+                      <span className="text-slate-400 font-semibold">เครื่องจักร/อุปกรณ์</span>
+                      <p className="font-bold text-slate-800 mt-1 px-3 py-2 bg-slate-50 rounded-xl border border-slate-100">ห้อง Gen/ห้องMDB/ห้องน้ำมัน Gen</p>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 font-semibold">ความถี่การตรวจเช็ค</span>
+                      <p className="font-bold text-slate-800 mt-1 px-3 py-2 bg-slate-50 rounded-xl border border-slate-100">ทุกวันที่ 5,17,29</p>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 font-semibold">สถานที่</span>
+                      <p className="font-bold text-slate-800 mt-1 px-3 py-2 bg-slate-50 rounded-xl border border-slate-100">{formData.location}</p>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-100 space-y-3">
+                    <div>
+                      <label className="font-bold text-slate-500 block">📅 วันที่ทำ PM</label>
+                      <input type="date" name="pmDate" value={formData.pmDate} onChange={handleInputChange} className="w-full mt-1 p-2 border rounded-xl bg-slate-50/50 text-xs font-bold outline-none focus:ring-2 focus:ring-green-500" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="font-bold text-slate-500 block">⏰ เวลาเริ่ม</label>
+                        <input type="time" name="startTime" value={formData.startTime} onChange={handleInputChange} className="w-full mt-1 p-2 border rounded-xl bg-slate-50/50 text-xs font-bold outline-none focus:ring-2 focus:ring-green-500" />
+                      </div>
+                      <div>
+                        <label className="font-bold text-slate-500 block">⏰ เวลาสิ้นสุด</label>
+                        <input type="time" name="endTime" value={formData.endTime} onChange={handleInputChange} className="w-full mt-1 p-2 border rounded-xl bg-slate-50/50 text-xs font-bold outline-none focus:ring-2 focus:ring-green-500" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="font-bold text-slate-500 block">👤 ผู้มอบหมายงาน</label>
+                      <input list="assigners" name="assigner" value={formData.assigner} onChange={handleInputChange} className="w-full mt-1 p-2 border rounded-xl bg-slate-50/50 text-xs font-bold outline-none focus:ring-2 focus:ring-green-500" />
+                    </div>
+                    <div>
+                      <label className="font-bold text-slate-500 block">👥 รายชื่อผู้ปฏิบัติงาน (ใส่ได้สูงสุด 4 คน)</label>
+                      <div className="grid grid-cols-2 gap-2 mt-1">
+                        {[1, 2, 3, 4].map(n => (
+                          <input key={n} list="operators" name={`operator${n}`} value={formData[`operator${n}`]} onChange={handleInputChange} placeholder={`ผู้ปฏิบัติงานคนที่ ${n}`} className="p-2 border rounded-xl text-xs bg-slate-50/50 font-semibold outline-none focus:ring-2 focus:ring-green-500" />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+                {/* รายการตรวจเช็คหน้างานแยกห้อง */}
+                <div className="flex justify-between items-center text-xs font-bold px-1 text-slate-400">
+                  <span>📋 รายการตรวจสอบแยกตามห้อง ({checklistItems.length})</span>
+                  <button type="button" onClick={() => setIsManageModalOpen(true)} className="text-green-600 hover:underline">🔧 เพิ่มหัวข้อตรวจภายหลัง</button>
+                </div>
+
+                <section className="space-y-2.5">
+                  {checklistItems.map((item, index) => (
+                    <div key={item.id} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-xs space-y-3 flex flex-col justify-between">
+                      <div className="flex items-start space-x-2">
+                        <span className="text-xs font-bold text-green-600 mt-0.5">{index + 1}.</span>
+                        <p className="text-xs font-bold text-slate-700 leading-relaxed">{item.text}</p>
+                      </div>
+                      
+                      <div className="flex space-x-2 pt-1">
+                        <button type="button" onClick={() => handleStatusChange(item.id, "ปกติ")} className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all ${item.status === "ปกติ" ? "bg-green-600 text-white border-green-600 shadow-xs" : "bg-slate-50 text-slate-400 border-slate-200"}`}>
+                          🟢 ปกติ
+                        </button>
+                        <button type="button" onClick={() => handleStatusChange(item.id, "ไม่ปกติ")} className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all ${item.status === "ไม่ปกติ" ? "bg-red-500 text-white border-red-500 shadow-xs" : "bg-slate-50 text-slate-400 border-slate-200"}`}>
+                          🔴 ไม่ปกติ
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </section>
+
+                {/* ส่วนสรุปผลและรายงานผู้ปิดงาน */}
+                <section className="bg-white p-5 rounded-3xl shadow-xs border border-slate-100 space-y-4 text-xs">
+                  <div>
+                    <span className="font-bold text-slate-400 uppercase block mb-1.5">📌 สรุปผลการ PM ภาพรวม</span>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button type="button" onClick={() => setFormData(p => ({ ...p, overallStatus: "ปกติ" }))} className={`p-2.5 rounded-xl border text-xs font-bold text-center transition-all ${formData.overallStatus === "ปกติ" ? "bg-green-600 text-white border-green-600" : "bg-slate-50 text-slate-400"}`}>🟢 ปกติ</button>
+                      <button type="button" onClick={() => setFormData(p => ({ ...p, overallStatus: "ไม่ปกติ" }))} className={`p-2.5 rounded-xl border text-xs font-bold text-center transition-all ${formData.overallStatus === "ไม่ปกติ" ? "bg-red-500 text-white border-red-500" : "bg-slate-50 text-slate-400"}`}>🔴 ไม่ปกติ</button>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="font-bold text-slate-400 block mb-1">✍️ กล่องข้อความสรุป / หมายเหตุเพิ่มเติม</label>
+                    <textarea name="summaryText" value={formData.summaryText} onChange={handleInputChange} rows="2" placeholder="กรอกข้อความสรุปสถานะการทำงาน..." className="w-full p-2.5 border rounded-xl outline-none text-xs bg-slate-50/50" />
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-100">
+                    <label className="font-bold text-slate-500 block">🖋️ ลงชื่อผู้ปฏิบัติงานหลัก (ผู้ปิดงาน)</label>
+                    <input list="operators" name="signee" value={formData.signee} onChange={handleInputChange} placeholder="เลือกหรือพิมพ์รายชื่อเพื่อลงนาม" className="w-full mt-1 p-2.5 border rounded-xl bg-slate-50 font-bold text-xs outline-none focus:ring-2 focus:ring-green-500" />
+                  </div>
+                </section>
+
+                {/* หน้าสุดท้าย: ปุ่มกดยืนยันการส่งข้อมูล */}
+                <div className="bg-white p-3 rounded-3xl shadow-xs border border-slate-100">
+                  <button type="submit" disabled={isSubmitting} className="w-full py-3.5 bg-green-600 hover:bg-green-700 text-white text-xs font-bold rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center">
+                    {isSubmitting ? "🚀 กำลังบันทึกข้อมูล..." : "💾 ยืนยันการส่งข้อมูลรายงาน PM"}
+                  </button>
+                </div>
+              </form>
+            </main>
+          </div>
+
+          <footer className="text-center text-[9px] text-slate-400 font-medium my-4">
+            <p>© 2026 CP ALL PUBLIC COMPANY LIMITED. ALL RIGHTS RESERVED</p>
+          </footer>
+
+          {/* Modal จัดการสำหรับเพิ่มหรือลบรายการตรวจสอบเพิ่มเติมในภายหลัง */}
+          {isManageModalOpen && (
+            <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-end justify-center">
+              <div className="bg-white w-full max-w-md rounded-t-3xl p-5 flex flex-col max-h-[80vh] shadow-xl animate-fadeIn">
+                <div className="flex justify-between items-center pb-3 border-b">
+                  <h3 className="text-xs font-bold text-slate-700">⚙️ จัดการรายการตรวจสอบเพิ่มเติม</h3>
+                  <button type="button" onClick={() => setIsManageModalOpen(false)} className="text-xs font-bold text-slate-400 hover:text-slate-600">ปิดหน้าต่าง</button>
+                </div>
+
+                <form onSubmit={handleAddCheckItem} className="mt-3 flex space-x-2">
+                  <input type="text" placeholder="พิมพ์ชื่อหัวข้อการตรวจเช็คใหม่..." value={newCheckItemText} onChange={(e) => setNewCheckItemText(e.target.value)} className="flex-1 p-2 text-xs border rounded-xl outline-none" />
+                  <button type="submit" className="px-3 bg-green-600 text-white font-bold text-xs rounded-xl">เพิ่ม</button>
+                </form>
+                
+                <div className="flex-1 overflow-y-auto mt-3 py-1 space-y-2 no-scrollbar">
+                  {checklistItems.map((item, idx) => (
+                    <div key={item.id} className="flex items-center justify-between bg-slate-50 p-2 rounded-xl border border-slate-100">
+                      <span className="text-xs text-slate-600 font-semibold truncate pr-2">{idx + 1}. {item.text}</span>
+                      <button type="button" onClick={() => handleRemoveCheckItem(item.id)} className="text-slate-400 hover:text-red-500 p-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2.5" stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* แหล่งชุดข้อมูล Auto-complete Datalist */}
+          <datalist id="assigners">{assignerList.map((n, i) => <option key={i} value={n} />)}</datalist>
+          <datalist id="operators">{operatorList.map((n, i) => <option key={i} value={n} />)}</datalist>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
