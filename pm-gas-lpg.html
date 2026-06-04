@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Check Sheet PM - LPG Gas System</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Anuphan:wght@300;400;500;600;700&display=swap');
+    body {
+      font-family: 'Anuphan', sans-serif;
+    }
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fadeIn {
+      animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen pb-12">
+
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    // 🔴 วาง URL ของ Web App ที่ได้จาก Google Apps Script ที่นี่หลังจากสั่ง Deploy หลังบ้าน
+    const GOOGLE_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxrO-QuY_UbI8TpkhIrYbB1w63PfsgKyezrZwFrbz9dG9WmvoeqVSKOywmoZXt_zxfk/exec";
+
+    // รายการตรวจเช็คเวอร์ชันอัปเดต 31 ข้อ (เพิ่มการระบุค่าแรงดันของร้านค้าทั้ง 3 ร้าน)
+    const defaultChecklist = [
+      // สถานี/ห้องเก็บถังแก๊ส - ถังแก๊ส
+      { id: "gas-1", num: 1, cat: "สถานี/ห้องเก็บถังแก๊ส", sub: "ถังแก๊ส", text: "สภาพดี สะอาด", status: "ปกติ" },
+      { id: "gas-2", num: 2, cat: "สถานี/ห้องเก็บถังแก๊ส", sub: "ถังแก๊ส", text: "วางบนฐานที่ตั้งอย่างมั่นคง", status: "ปกติ" },
+      { id: "gas-3", num: 3, cat: "สถานี/ห้องเก็บถังแก๊ส", sub: "ถังแก๊ส", text: "สายคล้องรัดถังแก๊สอย่างมั่นคง", status: "ปกติ" },
+      { id: "gas-4", num: 4, cat: "สถานี/ห้องเก็บถังแก๊ส", sub: "ถังแก๊ส", text: "ถังมีตรามาตรฐาน มอก. แสดง", status: "ปกติ" },
+      { id: "gas-5", num: 5, cat: "สถานี/ห้องเก็บถังแก๊ส", sub: "ถังแก๊ส", text: "ทดสอบรั่วโดยน้ำฟองสบู่", status: "ปกติ" },
+      
+      // สถานี/ห้องเก็บถังแก๊ส - สายแก๊ส
+      { id: "gas-6", num: 6, cat: "สถานี/ห้องเก็บถังแก๊ส", sub: "สายแก๊ส", text: "แคล้มป์รัดอยู่ในสภาพดี", status: "ปกติ" },
+      { id: "gas-7", num: 7, cat: "สถานี/ห้องเก็บถังแก๊ส", sub: "สายแก๊ส", text: "ขันแน่น ไม่หลุด หรือหลวม", status: "ปกติ" },
+      { id: "gas-8", num: 8, cat: "สถานี/ห้องเก็บถังแก๊ส", sub: "สายแก๊ส", text: "สายแก๊สอยู่ในสภาพดี สะอาด", status: "ปกติ" },
+      { id: "gas-9", num: 9, cat: "สถานี/ห้องเก็บถังแก๊ส", sub: "สายแก๊ส", text: "สายแก๊สต้องไม่มีรอยแตก", status: "ปกติ" },
+      { id: "gas-10", num: 10, cat: "สถานี/ห้องเก็บถังแก๊ส", sub: "สายแก๊ส", text: "ทดสอบรั่วโดยน้ำฟองสบู่", status: "ปกติ" },
+      
+      // สถานี/ห้องเก็บถังแก๊ส - มิเตอร์วัดและเกจวัด
+      { id: "gas-11", num: 11, cat: "สถานี/ห้องเก็บถังแก๊ส", sub: "มิเตอร์วัดและเกจวัด", text: "สภาพดี สะอาด", status: "ปกติ" },
+      { id: "gas-12", num: 12, cat: "สถานี/ห้องเก็บถังแก๊ส", sub: "มิเตอร์วัดและเกจวัด", text: "ทดสอบรั่วโดยน้ำฟองสบู่", status: "ปกติ" },
+      { id: "gas-13", num: 13, cat: "สถานี/ห้องเก็บถังแก๊ส", sub: "มิเตอร์วัดและเกจวัด", text: "เกจวัดค่าไม่เกิน 60PSI (ระบุค่า)", status: "ปกติ", hasCustomValue: true, customValue: "" },
+      
+      // สถานี/ห้องเก็บถังแก๊ส - ท่อภายในระบบ เตาแก๊สและวาล์วปิด-เปิด
+      { id: "gas-14", num: 14, cat: "สถานี/ห้องเก็บถังแก๊ส", sub: "ท่อและวาล์วระบบ", text: "ทดสอบสถานะวาล์ว และการเปิดปิด", status: "ปกติ" },
+      
+      // จุดใช้งาน (ร้านทั้ง 3 ร้าน)
+      { id: "gas-15", num: 15, cat: "จุดใช้งาน (ร้านทั้ง 3 ร้าน)", sub: "ร้านที่ 1", text: "มิเตอร์แก๊ส อยู่ในสภาพดี สะอาด", status: "ปกติ" },
+      { id: "gas-16", num: 16, cat: "จุดใช้งาน (ร้านทั้ง 3 ร้าน)", sub: "ร้านที่ 1", text: "วาล์วปิด-เปิดทำงานได้ปกติ", status: "ปกติ" },
+      { id: "gas-17", num: 17, cat: "จุดใช้งาน (ร้านทั้ง 3 ร้าน)", sub: "ร้านที่ 1", text: "ทดสอบรั่วโดยน้ำฟองสบู่", status: "ปกติ" },
+      { id: "gas-18", num: 18, cat: "จุดใช้งาน (ร้านทั้ง 3 ร้าน)", sub: "ร้านที่ 1", text: "ตรวจวัดแรงดันแก๊สร้านที่ 1 (ระบุค่า)", status: "ปกติ", hasCustomValue: true, customValue: "" },
+      
+      { id: "gas-19", num: 19, cat: "จุดใช้งาน (ร้านทั้ง 3 ร้าน)", sub: "ร้านที่ 2", text: "มิเตอร์แก๊ส อยู่ในสภาพดี สะอาด", status: "ปกติ" },
+      { id: "gas-20", num: 20, cat: "จุดใช้งาน (ร้านทั้ง 3 ร้าน)", sub: "ร้านที่ 2", text: "วาล์วปิด-เปิดทำงานได้ปกติ", status: "ปกติ" },
+      { id: "gas-21", num: 21, cat: "จุดใช้งาน (ร้านทั้ง 3 ร้าน)", sub: "ร้านที่ 2", text: "ทดสอบรั่วโดยน้ำฟองสบู่", status: "ปกติ" },
+      { id: "gas-22", num: 22, cat: "จุดใช้งาน (ร้านทั้ง 3 ร้าน)", sub: "ร้านที่ 2", text: "ตรวจวัดแรงดันแก๊สร้านที่ 2 (ระบุค่า)", status: "ปกติ", hasCustomValue: true, customValue: "" },
+      
+      { id: "gas-23", num: 23, cat: "จุดใช้งาน (ร้านทั้ง 3 ร้าน)", sub: "ร้านที่ 3", text: "มิเตอร์แก๊ส อยู่ในสภาพดี สะอาด", status: "ปกติ" },
+      { id: "gas-24", num: 24, cat: "จุดใช้งาน (ร้านทั้ง 3 ร้าน)", sub: "ร้านที่ 3", text: "วาล์วปิด-เปิดทำงานได้ปกติ", status: "ปกติ" },
+      { id: "gas-25", num: 25, cat: "จุดใช้งาน (ร้านทั้ง 3 ร้าน)", sub: "ร้านที่ 3", text: "ทดสอบรั่วโดยน้ำฟองสบู่", status: "ปกติ" },
+      { id: "gas-26", num: 26, cat: "จุดใช้งาน (ร้านทั้ง 3 ร้าน)", sub: "ร้านที่ 3", text: "ตรวจวัดแรงดันแก๊สร้านที่ 3 (ระบุค่า)", status: "ปกติ", hasCustomValue: true, customValue: "" },
+      
+      // ทดสอบอุปกรณ์ตรวจจับและตัดการทำงานฉุกเฉิน
+      { id: "gas-27", num: 27, cat: "ทดสอบอุปกรณ์ตรวจจับและตัดการทำงานฉุกเฉิน", sub: "ห้องเก็บแก๊ส", text: "วาล์วนิรภัย (ทดสอบทุกเดือน)", status: "ปกติ" },
+      { id: "gas-28", num: 28, cat: "ทดสอบอุปกรณ์ตรวจจับและตัดการทำงานฉุกเฉิน", sub: "ห้องเก็บแก๊ส", text: "Gas Detector (ทดสอบทุกเดือน)", status: "ปกติ" },
+      { id: "gas-29", num: 29, cat: "ทดสอบอุปกรณ์ตรวจจับและตัดการทำงานฉุกเฉิน", sub: "ร้าน 1", text: "Gas Detector (ทดสอบทุกเดือน)", status: "ปกติ" },
+      { id: "gas-30", num: 30, cat: "ทดสอบอุปกรณ์ตรวจจับและตัดการทำงานฉุกเฉิน", sub: "ร้าน 2", text: "Gas Detector (ทดสอบทุกเดือน)", status: "ปกติ" },
+      { id: "gas-31", num: 31, cat: "ทดสอบอุปกรณ์ตรวจจับและตัดการทำงานฉุกเฉิน", sub: "ร้าน 3", text: "Gas Detector (ทดสอบทุกเดือน)", status: "ปกติ" }
+    ];
+
+    function App() {
+      const assignerList = ["เกรียงศักดิ์", "ณรงค์", "รัฐชานนท์"];
+      const operatorList = ["ณรงค์", "รัฐชานนท์", "บัญชา", "วสุพล", "ศรายุทธ", "พิพัฒน์", "ศรราม เอี่ยมอาจ", "วงศธร", "เกรียงศักดิ์"];
+      const todayStr = new Date().toISOString().split('T')[0];
+
+      const [formData, setFormData] = useState({
+        assigner: "เกรียงศักดิ์",
+        location: "โรงอาหารผู้รับเหมา",
+        pmDate: todayStr,
+        startTime: "",
+        endTime: "",
+        operator1: "", operator2: "", operator3: "", operator4: "",
+        summaryText: "",
+        overallStatus: "ปกติ",
+        signee: ""
+      });
+
+      // อัปเดตเวอร์ชัน LocalStorage เพื่อรีเซ็ตโครงสร้างข้อมูลใหม่ 31 ข้อ
+      const [checklistItems, setChecklistItems] = useState(() => {
+        const saved = localStorage.getItem("pm_lpg_gas_checklist_v2");
+        return saved ? JSON.parse(saved) : defaultChecklist;
+      });
+
+      const [isManageModalOpen, setIsManageModalOpen] = useState(false);
+      const [newCheckItemText, setNewCheckItemText] = useState("");
+      const [newCheckItemCat, setNewCheckItemCat] = useState("สถานี/ห้องเก็บถังแก๊ส");
+      const [isSubmitting, setIsSubmitting] = useState(false);
+      const [alertMsg, setAlertMsg] = useState("");
+      const [submitStatus, setSubmitStatus] = useState(null);
+
+      useEffect(() => {
+        localStorage.setItem("pm_lpg_gas_checklist_v2", JSON.stringify(checklistItems));
+      }, [checklistItems]);
+
+      const handleInputChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value }));
+      };
+
+      const handleStatusChange = (itemId, nextStatus) => {
+        setChecklistItems(prev => prev.map(item => 
+          item.id === itemId ? { ...item, status: nextStatus } : item
+        ));
+      };
+
+      const handleValueChange = (itemId, val) => {
+        setChecklistItems(prev => prev.map(item => 
+          item.id === itemId ? { ...item, customValue: val } : item
+        ));
+      };
+
+      const handleAddCheckItem = (e) => {
+        e.preventDefault();
+        if (!newCheckItemText.trim()) return;
+        const newItem = {
+          id: `custom-${Date.now()}`,
+          num: checklistItems.length + 1,
+          cat: newCheckItemCat,
+          sub: "เพิ่มเติม",
+          text: newCheckItemText.trim(),
+          status: "ปกติ"
+        };
+        setChecklistItems([...checklistItems, newItem]);
+        setNewCheckItemText("");
+      };
+
+      const handleRemoveCheckItem = (itemId) => {
+        setChecklistItems(checklistItems.filter(item => item.id !== itemId));
+      };
+
+      const handleFormSubmit = async (e) => {
+        e.preventDefault();
+        setAlertMsg("");
+        setSubmitStatus(null);
+
+        if (!formData.startTime || !formData.endTime || !formData.operator1 || !formData.signee) {
+          setAlertMsg("⚠️ กรุณากรอกเวลาทำงาน เลือกรายชื่อช่าง และลงชื่อผู้ปฏิบัติงานหลักให้เรียบร้อย");
+          window.scrollTo({ top: 0, behavior: "smooth" });
+          return;
+        }
+
+        setIsSubmitting(true);
+
+        try {
+          const postData = { ...formData, checklistItems };
+          await fetch(GOOGLE_WEB_APP_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({ data: JSON.stringify(postData) })
+          });
+
+          setSubmitStatus('success');
+          setAlertMsg("🎉 บันทึกข้อมูลระบบ Gas LPG เข้า Google Sheet เรียบร้อยแล้ว!");
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        } catch (err) {
+          setSubmitStatus('error');
+          setAlertMsg("❌ เกิดข้อผิดพลาด ไม่สามารถส่งข้อมูลได้ โปรดตรวจสอบ URL Web App หรือเครือข่าย");
+        } finally {
+          setIsSubmitting(false);
+        }
+      };
+
+      const groupedItems = checklistItems.reduce((acc, item) => {
+        if (!acc[item.cat]) acc[item.cat] = [];
+        return { ...acc, [item.cat]: [...acc[item.cat], item] };
+      }, {});
+
+      return (
+        <div className="max-w-md mx-auto min-h-screen flex flex-col justify-between">
+          <div>
+            {/* Header: ส่วนหัวกระดาษตามข้อกำหนดหลัก */}
+            <header className="bg-white shadow-xs border-b-4 border-green-600 sticky top-0 z-30">
+              <div className="p-4">
+                <div className="flex items-center justify-between">
+                  <span className="bg-green-600 text-white text-[10px] font-black px-2 py-0.5 rounded">CP ALL</span>
+                  <span className="text-[10px] text-slate-400 font-bold flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-3 h-3 mr-1">
+                      <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
+                      <line x1="12" y1="18" x2="12.01" y2="18" />
+                    </svg>
+                    ระบบมือถือหน้างาน
+                  </span>
+                </div>
+                <h1 className="text-md font-extrabold text-slate-900 mt-1">บริษัท ซีพีออลล์ จำกัด (มหาชน)</h1>
+                <h2 className="text-xs font-bold text-slate-600 mt-0.5 flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-green-600 mr-1.5 w-3 h-3">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                  </svg>
+                  Check Sheet การบำรุงรักษาเครื่องจักร/อุปกรณ์
+                </h2>
+                <div className="grid grid-cols-3 gap-1 mt-2.5 pt-2 border-t border-slate-100 text-[9px] text-slate-500 font-semibold">
+                  <div>รหัส: <span className="text-slate-800 font-bold">B3-FM-10-01-06</span></div>
+                  <div className="text-center">ปรับปรุงครั้งที่: <span className="text-slate-800 font-bold">0</span></div>
+                  <div className="text-right">ประกาศใช้: <span className="text-slate-800 font-bold">1 เม.ย. 2560</span></div>
+                </div>
+              </div>
+            </header>
+
+            {/* ส่วนของฟอร์มกรอกข้อมูล */}
+            <main className="p-4 space-y-4 animate-fadeIn">
+              {alertMsg && (
+                <div className={`p-4 rounded-2xl text-xs font-bold text-center border-2 ${submitStatus === 'success' ? 'bg-green-100 border-green-400 text-green-800' : 'bg-red-100 border-red-400 text-red-800'}`}>
+                  {alertMsg}
+                </div>
+              )}
+
+              <form onSubmit={handleFormSubmit} className="space-y-4">
+                {/* ข้อมูลทั่วไปและแผนงาน PM */}
+                <section className="bg-white rounded-3xl p-5 shadow-xs border border-slate-100 space-y-3 text-xs">
+                  <div className="flex items-center text-green-700 font-bold border-b pb-2 text-sm">
+                    <span>📊 รายละเอียดแผนงานระบบแก๊ส</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="col-span-2">
+                      <span className="text-slate-400 font-semibold">เครื่องจักร/อุปกรณ์</span>
+                      <p className="font-bold text-slate-800 mt-1 px-3 py-2 bg-slate-50 rounded-xl border border-slate-100">ระบบ Gas LPG</p>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 font-semibold">ความถี่การตรวจเช็ค</span>
+                      <p className="font-bold text-slate-800 mt-1 px-3 py-2 bg-slate-50 rounded-xl border border-slate-100">รอบประจำเดือน</p>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 font-semibold">สถานที่</span>
+                      <p className="font-bold text-slate-800 mt-1 px-3 py-2 bg-slate-50 rounded-xl border border-slate-100">{formData.location}</p>
+                    </div>
+                  </div>
+
+                  {/* วันที่ทำ PM อยู่ใต้กล่องสถานที่ เหนือเวลาเริ่มและสิ้นสุด */}
+                  <div className="pt-2 border-t border-slate-100 space-y-3">
+                    <div>
+                      <label className="font-bold text-slate-500 block">📅 วันที่ทำ PM</label>
+                      <input type="date" name="pmDate" value={formData.pmDate} onChange={handleInputChange} className="w-full mt-1 p-2.5 border rounded-xl bg-slate-50/50 text-xs font-bold outline-none focus:ring-2 focus:ring-green-500" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="font-bold text-slate-500 block">⏰ เวลาเริ่ม</label>
+                        <input type="time" name="startTime" value={formData.startTime} onChange={handleInputChange} className="w-full mt-1 p-2.5 border rounded-xl bg-slate-50/50 text-xs font-bold outline-none focus:ring-2 focus:ring-green-500" />
+                      </div>
+                      <div>
+                        <label className="font-bold text-slate-500 block">⏰ เวลาสิ้นสุด</label>
+                        <input type="time" name="endTime" value={formData.endTime} onChange={handleInputChange} className="w-full mt-1 p-2.5 border rounded-xl bg-slate-50/50 text-xs font-bold outline-none focus:ring-2 focus:ring-green-500" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="font-bold text-slate-500 block">👤 ผู้มอบหมายงาน</label>
+                      <input list="assigners" name="assigner" value={formData.assigner} onChange={handleInputChange} className="w-full mt-1 p-2.5 border rounded-xl bg-slate-50/50 text-xs font-bold outline-none focus:ring-2 focus:ring-green-500" />
+                    </div>
+                    <div>
+                      <label className="font-bold text-slate-500 block">👥 รายชื่อผู้ปฏิบัติงาน (สูงสุด 4 คน)</label>
+                      <div className="grid grid-cols-2 gap-2 mt-1">
+                        {[1, 2, 3, 4].map(n => (
+                          <input key={n} list="operators" name={`operator${n}`} value={formData[`operator${n}`]} onChange={handleInputChange} placeholder={`ช่างปฏิบัติงานคนที่ ${n}`} className="p-2.5 border rounded-xl text-xs bg-slate-50/50 font-semibold outline-none focus:ring-2 focus:ring-green-500" />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+                {/* รายการตรวจสอบจำแนกตามกลุ่มงาน */}
+                <div className="flex justify-between items-center text-xs font-bold px-1 text-slate-400">
+                  <span>📋 รายการตรวจสอบหน้างาน ({checklistItems.length} ข้อ)</span>
+                  <button type="button" onClick={() => setIsManageModalOpen(true)} className="text-green-600 hover:underline">🔧 เพิ่มหัวข้อตรวจภายหลัง</button>
+                </div>
+
+                {Object.keys(groupedItems).map((categoryName) => (
+                  <div key={categoryName} className="space-y-2">
+                    <div className="text-xs font-extrabold text-slate-600 bg-slate-200/60 px-3 py-1.5 rounded-xl block shadow-2xs mt-3">
+                      📍 {categoryName}
+                    </div>
+                    
+                    {groupedItems[categoryName].map((item) => (
+                      <div key={item.id} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-2xs space-y-3">
+                        <div className="flex items-start justify-between space-x-2">
+                          <div className="flex-1">
+                            <span className="text-[10px] font-bold text-green-600 bg-green-50 px-1.5 py-0.5 rounded mr-1.5">{item.sub}</span>
+                            <span className="text-xs font-bold text-slate-700 leading-relaxed">
+                              ข้อ {item.num}: {item.text}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* รองรับกล่องกรอกข้อมูลแรงดันแก๊สพิเศษ (ข้อ 13, 18, 22, 26) */}
+                        {item.hasCustomValue && (
+                          <div className="bg-blue-50/50 p-2.5 rounded-xl border border-blue-100 flex items-center space-x-2 animate-fadeIn">
+                            <span className="text-[11px] font-bold text-blue-700 whitespace-nowrap">ระบุค่าแรงดันแก๊ส:</span>
+                            <input type="text" placeholder="ระบุค่าความดัน เช่น 45 PSI" value={item.customValue || ""} onChange={(e) => handleValueChange(item.id, e.target.value)} className="flex-1 p-1.5 text-xs font-bold bg-white border border-blue-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500" />
+                          </div>
+                        )}
+                        
+                        {/* ปุ่มเลือกสถานะปกติ/ไม่ปกติ */}
+                        <div className="flex space-x-2">
+                          <button type="button" onClick={() => handleStatusChange(item.id, "ปกติ")} className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all ${item.status === "ปกติ" ? "bg-green-600 text-white border-green-600 shadow-xs" : "bg-slate-50 text-slate-400 border-slate-200"}`}>
+                            🟢 ปกติ
+                          </button>
+                          <button type="button" onClick={() => handleStatusChange(item.id, "ไม่ปกติ")} className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all ${item.status === "ไม่ปกติ" ? "bg-red-500 text-white border-red-500 shadow-xs" : "bg-slate-50 text-slate-400 border-slate-200"}`}>
+                            🔴 ไม่ปกติ
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+
+                {/* ส่วนสรุปผลและรายงานผู้ปิดงาน */}
+                <section className="bg-white p-5 rounded-3xl shadow-xs border border-slate-100 space-y-4 text-xs">
+                  <div>
+                    <span className="font-bold text-slate-400 uppercase block mb-1.5">📌 สรุปผลการ PM ภาพรวม</span>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button type="button" onClick={() => setFormData(p => ({ ...p, overallStatus: "ปกติ" }))} className={`p-2.5 rounded-xl border text-xs font-bold text-center transition-all ${formData.overallStatus === "ปกติ" ? "bg-green-600 text-white border-green-600" : "bg-slate-50 text-slate-400"}`}>🟢 ปกติ</button>
+                      <button type="button" onClick={() => setFormData(p => ({ ...p, overallStatus: "ไม่ปกติ" }))} className={`p-2.5 rounded-xl border text-xs font-bold text-center transition-all ${formData.overallStatus === "ไม่ปกติ" ? "bg-red-500 text-white border-red-500" : "bg-slate-50 text-slate-400"}`}>🔴 ไม่ปกติ</button>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="font-bold text-slate-400 block mb-1">✍️ กล่องข้อความสรุป / หมายเหตุเพิ่มเติม</label>
+                    <textarea name="summaryText" value={formData.summaryText} onChange={handleInputChange} rows="2" placeholder="กรอกข้อความสรุปหรือรายละเอียดซ่อมบำรุงเพิ่มเติม..." className="w-full p-2.5 border rounded-xl outline-none text-xs bg-slate-50/50" />
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-100">
+                    <label className="font-bold text-slate-500 block">🖋️ ลงชื่อผู้ปฏิบัติงานหลัก (ผู้ปิดฟอร์ม)</label>
+                    <input list="operators" name="signee" value={formData.signee} onChange={handleInputChange} placeholder="คลิกเลือกหรือพิมพ์รายชื่อเพื่อเซ็นชื่อ" className="w-full mt-1 p-2.5 border rounded-xl bg-slate-50 font-bold text-xs outline-none focus:ring-2 focus:ring-green-500" />
+                  </div>
+                </section>
+
+                {/* หน้าสุดท้าย: ปุ่มยืนยันการส่งข้อมูลรายงานเข้า Google Sheet */}
+                <div className="bg-white p-3 rounded-3xl shadow-xs border border-slate-100">
+                  <button type="submit" disabled={isSubmitting} className="w-full py-3.5 bg-green-600 hover:bg-green-700 text-white text-xs font-bold rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center">
+                    {isSubmitting ? "🚀 กำลังส่งรายงานเข้าระบบ Google Sheet..." : "💾 ยืนยันการส่งข้อมูลรายงาน PM แก๊ส"}
+                  </button>
+                </div>
+              </form>
+            </main>
+          </div>
+
+          <footer className="text-center text-[9px] text-slate-400 font-medium my-4">
+            <p>© 2026 CP ALL PUBLIC COMPANY LIMITED. ALL RIGHTS RESERVED</p>
+          </footer>
+
+          {/* Modal จัดการสำหรับเพิ่มหัวข้อตรวจสอบเพิ่มเติมภายหลัง */}
+          {isManageModalOpen && (
+            <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-end justify-center">
+              <div className="bg-white w-full max-w-md rounded-t-3xl p-5 flex flex-col max-h-[80vh] shadow-xl animate-fadeIn">
+                <div className="flex justify-between items-center pb-3 border-b">
+                  <h3 className="text-xs font-bold text-slate-700">⚙️ เพิ่มหัวข้อการตรวจสอบแก๊สเพิ่มเติม</h3>
+                  <button type="button" onClick={() => setIsManageModalOpen(false)} className="text-xs font-bold text-slate-400 hover:text-slate-600">ปิด</button>
+                </div>
+
+                <div className="mt-3 space-y-2">
+                  <label className="text-[11px] font-bold text-slate-400 block">เลือกหมวดหมู่ปลายทาง:</label>
+                  <select value={newCheckItemCat} onChange={(e) => setNewCheckItemCat(e.target.value)} className="w-full p-2 text-xs border rounded-xl bg-slate-50 font-bold outline-none">
+                    <option value="สถานี/ห้องเก็บถังแก๊ส">สถานี/ห้องเก็บถังแก๊ส</option>
+                    <option value="จุดใช้งาน (ร้านทั้ง 3 ร้าน)">จุดใช้งาน (ร้านทั้ง 3 ร้าน)</option>
+                    <option value="ทดสอบอุปกรณ์ตรวจจับและตัดการทำงานฉุกเฉิน">ทดสอบอุปกรณ์ตรวจจับและตัดการทำงานฉุกเฉิน</option>
+                  </select>
+                </div>
+
+                <form onSubmit={handleAddCheckItem} className="mt-3 flex space-x-2">
+                  <input type="text" placeholder="ระบุชื่อหัวข้อตรวจสอบใหม่..." value={newCheckItemText} onChange={(e) => setNewCheckItemText(e.target.value)} className="flex-1 p-2 text-xs border rounded-xl outline-none" />
+                  <button type="submit" className="px-4 bg-green-600 text-white font-bold text-xs rounded-xl">เพิ่ม</button>
+                </form>
+                
+                <div className="flex-1 overflow-y-auto mt-4 py-1 space-y-2 no-scrollbar border-t pt-2">
+                  {checklistItems.map((item, idx) => (
+                    <div key={item.id} className="flex items-center justify-between bg-slate-50 p-2 rounded-xl border border-slate-100">
+                      <span className="text-xs text-slate-600 font-semibold truncate pr-2">
+                        [{item.sub}] ข้อ {item.num}: {item.text}
+                      </span>
+                      {item.id.startsWith("custom-") && (
+                        <button type="button" onClick={() => handleRemoveCheckItem(item.id)} className="text-slate-400 hover:text-red-500 p-1">
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2.5" stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Datalist ชุดข้อมูล Auto-complete */}
+          <datalist id="assigners">{assignerList.map((n, i) => <option key={i} value={n} />)}</datalist>
+          <datalist id="operators">{operatorList.map((n, i) => <option key={i} value={n} />)}</datalist>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
