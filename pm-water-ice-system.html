@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Check Sheet PM - ระบบกรองน้ำและทำน้ำแข็ง</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Anuphan:wght@300;400;500;600;700&display=swap');
+    body {
+      font-family: 'Anuphan', sans-serif;
+    }
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fadeIn {
+      animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen pb-12">
+
+  <div id="root">
+    <div class="flex items-center justify-center min-h-screen">
+      <div class="text-center p-6 bg-white rounded-2xl shadow-sm max-w-xs border border-slate-100">
+        <p class="text-xs font-bold text-slate-500 animate-pulse">กำลังโหลดระบบแอปพลิเคชัน PM...</p>
+      </div>
+    </div>
+  </div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo } = React;
+
+    // 🔗 ติดตั้งลิงก์ Google Web App API 
+    const GOOGLE_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbz-AyZcjCfKhzzsE1I2bCYUFgF4eGIFv8GpH4Y9rc8Y_H1Vs1FgtgpNwWXvJxkSqmBPfg/exec";
+
+    // รายการข้อมูลเครื่องจักรตั้งต้นพร้อมฟิลด์ 1.หมายเลขทรัพย์สิน และ 3.สถานะการใช้งาน (แก้ไขบั๊กเครื่องหมายคำพูด " เรียบร้อย)
+    const initialEquipments = [
+      { id: 'WAT-01', assetNo: 'N/A', location: 'ประตู48', type: 'ตู้ทำน้ำเย็น 4 หัวก๊อก', filterType: 'RO 20 นิ้ว 6 ขั้นตอน 300 GPD (2 Membrane)', hasPump: true, lastChange: '2026-03-01', category: 'WAT', status: 'ใช้งานอยู่' },
+      { id: 'WAT-02', assetNo: 'N/A', location: 'ประตู48', type: 'ตู้ทำน้ำเย็น 4 หัวก๊อก', filterType: 'RO 20 นิ้ว 5 ขั้นตอน 150 GPD', hasPump: true, lastChange: '2026-03-15', category: 'WAT', status: 'ใช้งานอยู่' },
+      { id: 'WAT-03', assetNo: 'N/A', location: 'ที่พักพนักงาน ข้างศาล', type: 'ตู้ทำน้ำเย็น 4 หัวก๊อก', filterType: 'RO 20 นิ้ว 7 ขั้นตอน 400 GPD (3 Membrane)', hasPump: true, lastChange: '2026-02-20', category: 'WAT', status: 'ใช้งานอยู่' },
+      { id: 'WAT-04', assetNo: 'N/A', location: 'ที่พักพนักงาน ข้างศาล', type: 'ตู้ทำน้ำร้อน-น้ำเย็น', filterType: 'UF (UltraFiltration)', hasPump: false, lastChange: '2026-04-01', category: 'WAT', status: 'ใช้งานอยู่' },
+      { id: 'WAT-05', assetNo: 'N/A', location: 'ออฟฟิศ ชั้น 2 ห้อง Pantry', type: 'ตู้ทำน้ำร้อน-น้ำเย็น', filterType: 'UF (UltraFiltration)', hasPump: false, lastChange: '2026-04-05', category: 'WAT', status: 'ใช้งานอยู่' },
+      { id: 'WAT-06', assetNo: 'N/A', location: 'โรงอาหาร ชั้น 2', type: 'ตู้ทำน้ำเย็น 5 หัวก๊อก', filterType: 'RO 20 นิ้ว 6 ขั้นตอน 300 GPD (2 Membrane)', hasPump: true, lastChange: '2026-01-10', category: 'WAT', status: 'ใช้งานอยู่' },
+      { id: 'WAT-07', assetNo: 'N/A', location: 'โรงอาหาร ชั้น 2', type: 'ตู้ทำน้ำเย็น 5 หัวก๊อก', filterType: 'RO 20 นิ้ว 5 ขั้นตอน 150 GPD', hasPump: true, lastChange: '2026-01-15', category: 'WAT', status: 'ใช้งานอยู่' },
+      { id: 'WAT-08', assetNo: 'N/A', location: 'โรงอาหาร ชั้น 2 หน้าห้องพักผ่อน', type: 'ตู้ทำน้ำร้อน-น้ำเย็น', filterType: 'UF (UltraFiltration)', hasPump: false, lastChange: '2026-03-20', category: 'WAT', status: 'ใช้งานอยู่' },
+      { id: 'WAT-09', assetNo: 'N/A', location: 'โรงอาหาร ผู้รับเหมา', type: 'ตู้ทำน้ำเย็น 4 หัวก๊อก', filterType: 'Super RO.5-12000LPD-15PP (Big Blue)', hasPump: true, lastChange: '2026-02-01', category: 'WAT', status: 'ใช้งานอยู่' },
+      { id: 'WAT-10', assetNo: 'N/A', location: 'โรงอาหาร ผู้รับเหมา', type: 'ตู้ทำน้ำเย็น 4 หัวก๊อก', filterType: 'Super RO.5-12000LPD-15PP (Big Blue)', hasPump: true, lastChange: '2026-02-05', category: 'WAT', status: 'ใช้งานอยู่' },
+      { id: 'WAT-11', assetNo: 'N/A', location: 'วิศวกรรม', type: 'ตู้ทำน้ำร้อน-น้ำเย็น', filterType: 'UF (UltraFiltration)', hasPump: false, lastChange: '2026-04-10', category: 'WAT', status: 'ใช้งานอยู่' },
+      { id: 'WAT-12', assetNo: 'N/A', location: 'ห้องพยาบาล', type: 'ตู้ทำน้ำร้อน-น้ำเย็น', filterType: 'UF (UltraFiltration)', hasPump: false, lastChange: '2026-04-12', category: 'WAT', status: 'ใช้งานอยู่' },
+      { id: 'WAT-13', assetNo: 'N/A', location: 'อาคารที่พักผู้รับเหมา', type: 'ตู้ทำน้ำเย็น 2 หัวก๊อก', filterType: 'UF (UltraFiltration)', hasPump: false, lastChange: '2026-03-25', category: 'WAT', status: 'ใช้งานอยู่' },
+      { id: 'ICE-1', assetNo: 'N/A', location: 'โรงอาหาร ชั้น 2 ข้างร้านน้ำ', type: 'เครื่องทำน้ำแข็ง', filterType: 'UF (UltraFiltration) 150 GPD', hasPump: false, lastChange: '2026-02-18', category: 'ICE', status: 'ใช้งานอยู่' },
+      { id: 'ICE-2', assetNo: 'N/A', location: 'โรงอาหาร ชั้น 2 ข้างร้านน้ำ', type: 'เครื่องทำน้ำแข็ง', filterType: 'UF (UltraFiltration) 150 GPD', hasPump: false, lastChange: '2026-02-18', category: 'ICE', status: 'ใช้งานอยู่' },
+      { id: 'ICE-3', assetNo: 'N/A', location: 'โรงอาหาร ชั้น 2 ข้างร้านน้ำ', type: 'เครื่องทำน้ำแข็ง', filterType: 'UF (UltraFiltration) 150 GPD', hasPump: false, lastChange: '2026-02-22', category: 'ICE', status: 'ใช้งานอยู่' }
+    ];
+
+    function App() {
+      const assignerList = ["เกรียงศักดิ์", "ณรงค์", "รัฐชานนท์"];
+      const operatorList = ["ณรงค์", "รัฐชานนท์", "บัญชา", "วสุพล", "ศรายุทธ", "พิพัฒน์", "ศรราม เอี่ยมอาจ", "วงศธร", "เกรียงศักดิ์"];
+      const locations = ["อาคาร DC", "อาคารโรงอาหารผู้รับเหมา"];
+
+      const todayStr = new Date().toISOString().split('T')[0];
+
+      const [currentView, setCurrentView] = useState('form');
+      const [equipmentTab, setEquipmentTab] = useState('WAT');
+
+      const [equipments, setEquipments] = useState(() => {
+        const saved = localStorage.getItem("cp_pm_equipments_v2");
+        return saved ? JSON.parse(saved) : initialEquipments;
+      });
+
+      // 📦 State สำหรับจัดการ Popup เพิ่ม/แก้ไขเครื่องจักร (Modal)
+      const [isModalOpen, setIsModalOpen] = useState(false);
+      const [isEditMode, setIsEditMode] = useState(false);
+      const [modalData, setModalData] = useState({
+        id: '', assetNo: '', location: '', type: '', filterType: '', hasPump: false, lastChange: todayStr, category: 'WAT', status: 'ใช้งานอยู่'
+      });
+
+      const [checklistState, setChecklistState] = useState(() => {
+        const initialStates = {};
+        equipments.forEach(eq => {
+          initialStates[eq.id] = {
+            q1: "ปกติ", q2: "ปกติ", q3: "ปกติ", q4: "ปกติ", q5: "ปกติ",
+            q6_tds: "",
+            q7_filter: "ยังไม่ถึงรอบ", q8: "ปกติ"
+          };
+        });
+        return initialStates;
+      });
+
+      const [headerData, setHeaderData] = useState({
+        location: "อาคาร DC",
+        assigner: "เกรียงศักดิ์",
+        overallStatus: "ปกติ",
+        summaryText: "",
+        pmDate1: todayStr, startTime1: "", endTime1: "",
+        op1_1: "", op1_2: "", op1_3: "", op1_4: "",
+        pmDate2: "", startTime2: "", endTime2: "",
+        op2_1: "", op2_2: "", op2_3: "", op2_4: ""
+      });
+
+      const [searchQuery, setSearchQuery] = useState("");
+      const [isSubmitting, setIsSubmitting] = useState(false);
+      const [submitStage, setSubmitStage] = useState('idle'); 
+      const [alertMsg, setAlertMsg] = useState("");
+
+      useEffect(() => {
+        localStorage.setItem("cp_pm_equipments_v2", JSON.stringify(equipments));
+      }, [equipments]);
+
+      const getNextDueDate = (dateStr) => {
+        if (!dateStr) return "";
+        const d = new Date(dateStr);
+        d.setMonth(d.getMonth() + 3);
+        return d.toISOString().split('T')[0];
+      };
+
+      const isOverdue = (dateStr) => {
+        const nextDate = getNextDueDate(dateStr);
+        if (!nextDate) return false;
+        return new Date(nextDate) <= new Date();
+      };
+
+      const handleHeaderChange = (e) => {
+        const { name, value } = e.target;
+        setHeaderData(prev => ({ ...prev, [name]: value }));
+      };
+
+      const handleChecklistChange = (id, field, value) => {
+        setChecklistState(prev => ({
+          ...prev,
+          [id]: { ...prev[id], [field]: value }
+        }));
+
+        if (field === 'q7_filter' && value === 'เปลี่ยน') {
+          setEquipments(prev => prev.map(eq => {
+            if (eq.id === id) {
+              return { ...eq, lastChange: todayStr };
+            }
+            return eq;
+          }));
+        }
+      };
+
+      // 🛠 เปิด Modal สำหรับ 2.เพิ่ม หรือ แก้ไขเครื่องจักร
+      const handleOpenModal = (target = null) => {
+        if (target) {
+          setIsEditMode(true);
+          setModalData(target);
+        } else {
+          setIsEditMode(false);
+          setModalData({
+            id: '', assetNo: '', location: '', type: '', filterType: '', hasPump: false, lastChange: todayStr, category: equipmentTab, status: 'ใช้งานอยู่'
+          });
+        }
+        setIsModalOpen(true);
+      };
+
+      // 💾 บันทึกข้อมูลเครื่องจักรจาก Modal เข้าสู่ระบบหลัก
+      const handleSaveEquipment = (e) => {
+        e.preventDefault();
+        if (!modalData.id) return;
+
+        if (isEditMode) {
+          setEquipments(prev => prev.map(item => item.id === modalData.id ? modalData : item));
+        } else {
+          // ตรวจสอบไม่ให้รหัสซ้ำ
+          if (equipments.some(eq => eq.id === modalData.id)) {
+            alert("⚠️ รหัสอุปกรณ์นี้มีอยู่ในระบบแล้ว ไม่สามารถเพิ่มซ้ำได้");
+            return;
+          }
+          setEquipments(prev => [...prev, modalData]);
+          setChecklistState(prev => ({
+            ...prev,
+            [modalData.id]: { q1: "ปกติ", q2: "ปกติ", q3: "ปกติ", q4: "ปกติ", q5: "ปกติ", q6_tds: "", q7_filter: "ยังไม่ถึงรอบ", q8: "ปกติ" }
+          }));
+        }
+        setIsModalOpen(false);
+      };
+
+      const handleFormSubmit = async (e) => {
+        e.preventDefault();
+        setAlertMsg("");
+        setSubmitStage('idle');
+
+        if (!headerData.startTime1 || !headerData.endTime1 || !headerData.op1_1) {
+          setAlertMsg("⚠️ กรุณากรอกเวลางานและรายชื่อผู้ปฏิบัติงานหลักในวันที่ 1 ให้ครบถ้วน");
+          window.scrollTo({ top: 0, behavior: "smooth" });
+          return;
+        }
+
+        setIsSubmitting(true);
+        setSubmitStage('sending');
+
+        try {
+          // กรองส่งข้อมูลเฉพาะเครื่องจักรที่มีสถานะเป็น "ใช้งานอยู่" เท่านั้น
+          const activeEquipments = equipments.filter(eq => eq.status !== "ยกเลิก");
+
+          const payload = {
+            metadata: headerData,
+            checklist: checklistState,
+            equipmentSnapshot: activeEquipments
+          };
+
+          await fetch(GOOGLE_WEB_APP_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({ data: JSON.stringify(payload) })
+          });
+
+          setSubmitStage('success');
+          setAlertMsg("🎉 บันทึกใบงานตรวจเช็คและส่งประวัติเข้าคลาวด์ Google Sheet เรียบร้อยแล้ว!");
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        } catch (err) {
+          setSubmitStage('error');
+          setAlertMsg("❌ เกิดข้อผิดพลาดในการเชื่อมต่อเครือข่าย");
+        } finally {
+          setIsSubmitting(false);
+        }
+      };
+
+      const filteredEquipments = useMemo(() => {
+        return equipments.filter(eq => eq.category === equipmentTab && (
+          eq.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          eq.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          eq.filterType.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (eq.assetNo && eq.assetNo.toLowerCase().includes(searchQuery.toLowerCase()))
+        ));
+      }, [equipments, equipmentTab, searchQuery]);
+
+      return (
+        <div className="max-w-md mx-auto min-h-screen flex flex-col bg-slate-50 shadow-xl relative border border-slate-200/60">
+          
+          {/* Header */}
+          <header className="bg-white border-b-4 border-emerald-600 shadow-xs sticky top-0 z-40">
+            <div className="p-4">
+              <div className="flex items-center justify-between text-[10px]">
+                <span className="bg-emerald-600 text-white font-black px-2 py-0.5 rounded tracking-wide">CP ALL</span>
+                <span className="text-slate-400 font-bold flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="w-2.5 h-2.5 mr-1 text-emerald-500">
+                    <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
+                    <line x1="12" y1="18" x2="12.01" y2="18" />
+                  </svg>
+                  ระบบตรวจสอบโมบายแอป
+                </span>
+              </div>
+              
+              <div className="flex justify-between items-center mt-1.5">
+                <h1 className="text-[15px] font-extrabold text-slate-900 tracking-tight">บริษัท ซีพีออลล์ จำกัด (มหาชน)</h1>
+                {/* 2. ปุ่มเพิ่มเครื่องจักรกรณีต้องการขยายชุดจุดติดตั้งเพิ่ม */}
+                <button type="button" onClick={() => handleOpenModal(null)} className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-black px-2 py-1 rounded-xl hover:bg-emerald-100 transition shadow-2xs">
+                  ➕ เพิ่มเครื่องจักร
+                </button>
+              </div>
+
+              <h2 className="text-[12px] font-bold text-slate-600 flex items-center mt-0.5">
+                <span className="bg-emerald-50 text-emerald-700 p-0.5 rounded mr-1.5 shrink-0">📋</span>
+                Check Sheet การบำรุงรักษาเครื่องจักร/อุปกรณ์
+              </h2>
+              
+              <div className="grid grid-cols-3 gap-1 mt-3 pt-2.5 border-t border-slate-100 text-[9px] text-slate-500 font-semibold text-center">
+                <div className="text-left">รหัสฟอร์ม: <span className="text-slate-800 font-bold block">B3-FM-10-01-06</span></div>
+                <div>ปรับปรุงครั้งที่: <span className="text-slate-800 font-bold block">0</span></div>
+                <div className="text-right">ประกาศใช้: <span className="text-slate-800 font-bold block">1 เม.ย. 2560</span></div>
+              </div>
+            </div>
+
+            <div className="flex border-t border-slate-100 bg-slate-50/80 p-1">
+              <button onClick={() => setCurrentView('form')} className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center space-x-1.5 ${currentView === 'form' ? 'bg-white text-emerald-700 shadow-xs border border-slate-200/50' : 'text-slate-500 hover:text-slate-800'}`}>
+                <span>📝 บันทึกใบงาน PM</span>
+              </button>
+              <button onClick={() => setCurrentView('history')} className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center space-x-1.5 ${currentView === 'history' ? 'bg-white text-emerald-700 shadow-xs border border-slate-200/50' : 'text-slate-500 hover:text-slate-800'}`}>
+                <span>🔍 ดูข้อมูล/ประวัติเครื่องจักร</span>
+              </button>
+            </div>
+          </header>
+
+          {alertMsg && (
+            <div className="px-4 pt-4 animate-fadeIn">
+              <div className={`p-3.5 rounded-2xl text-xs font-bold text-center border-2 ${submitStage === 'success' ? 'bg-green-50 border-green-300 text-green-800' : 'bg-red-50 border-red-300 text-red-800'}`}>
+                {alertMsg}
+              </div>
+            </div>
+          )}
+
+          {/* ================= VIEW 1: FORM VIEW ================= */}
+          {currentView === 'form' && (
+            <main className="p-4 space-y-4 flex-1 animate-fadeIn">
+              <form onSubmit={handleFormSubmit} className="space-y-4">
+                
+                <section className="bg-white rounded-3xl p-4 shadow-xs border border-slate-200/50 space-y-3 text-xs">
+                  <div className="flex items-center text-emerald-700 font-bold border-b border-slate-100 pb-2 text-xs">
+                    <span className="mr-1.5">⚙️</span> ข้อมูลเครื่องจักรและความถี่
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-[11px]">
+                    <div>
+                      <span className="text-slate-400 font-semibold">เครื่องจักร/อุปกรณ์</span>
+                      <p className="font-bold text-slate-800 mt-0.5 bg-slate-50 p-2 rounded-xl border border-slate-100 truncate">กรองน้ำดื่ม-ตู้ทำน้ำเย็น-เครื่องทำน้ำแข็ง</p>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 font-semibold">ความถี่แผนงาน</span>
+                      <p className="font-bold text-slate-800 mt-0.5 bg-slate-50 p-2 rounded-xl border border-slate-100">รอบประจำเดือน/ไตรมาส</p>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="text-slate-500 font-bold block mb-1">สถานที่ปฏิบัติงาน</label>
+                    <select name="location" value={headerData.location} onChange={handleHeaderChange} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:outline-none focus:border-emerald-500 text-xs">
+                      {locations.map((loc, idx) => <option key={idx} value={loc}>{loc}</option>)}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-slate-500 font-bold block mb-1">ผู้มอบหมายงาน</label>
+                    <input list="assigners" name="assigner" value={headerData.assigner} onChange={handleHeaderChange} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold focus:outline-none focus:border-emerald-500 text-xs" />
+                  </div>
+                </section>
+
+                <section className="bg-white rounded-3xl p-4 shadow-xs border border-slate-200/50 space-y-4">
+                  <div className="space-y-2 text-xs border-b border-slate-100 pb-3">
+                    <div className="font-bold text-emerald-700 flex items-center">
+                      <span className="mr-1">📅</span> ช่องบันทึกการทำงาน (วันที่ 1 - หลัก)
+                    </div>
+                    <div>
+                      <label className="text-slate-400 font-bold block mb-1">วันที่ทำ PM 1</label>
+                      <input type="date" name="pmDate1" value={headerData.pmDate1} onChange={handleHeaderChange} className="w-full p-2 bg-slate-50/50 border border-slate-200 rounded-xl text-xs font-semibold" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-slate-400 font-bold block mb-1">เวลาเริ่ม</label>
+                        <input type="time" name="startTime1" value={headerData.startTime1} onChange={handleHeaderChange} className="w-full p-2 bg-slate-50/50 border border-slate-200 rounded-xl text-xs" />
+                      </div>
+                      <div>
+                        <label className="text-slate-400 font-bold block mb-1">เวลาสิ้นสุด</label>
+                        <input type="time" name="endTime1" value={headerData.endTime1} onChange={handleHeaderChange} className="w-full p-2 bg-slate-50/50 border border-slate-200 rounded-xl text-xs" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-slate-400 font-bold block mb-1">รายชื่อผู้ปฏิบัติงาน วันที่ 1 (ระบุสูงสุด 4 คน)</label>
+                      <div className="grid grid-cols-2 gap-1.5 mt-1">
+                        {[1, 2, 3, 4].map(n => (
+                          <input key={n} list="operators" name={`op1_${n}`} value={headerData[`op1_${n}`]} onChange={handleHeaderChange} placeholder={`ช่างคนที่ ${n}`} className="p-2 border border-slate-200 rounded-xl text-xs bg-slate-50/50 font-medium" />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 text-xs">
+                    <div className="font-bold text-teal-700 flex items-center">
+                      <span className="mr-1">📅</span> ช่องบันทึกการทำงานเพิ่มเติม (วันที่ 2)
+                    </div>
+                    <div>
+                      <label className="text-teal-600/70 font-bold block mb-1">วันที่ทำ PM 2</label>
+                      <input type="date" name="pmDate2" value={headerData.pmDate2} onChange={handleHeaderChange} className="w-full p-2 bg-slate-50/50 border border-slate-200 rounded-xl text-xs font-semibold" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-teal-600/70 font-bold block mb-1">เวลาเริ่ม</label>
+                        <input type="time" name="startTime2" value={headerData.startTime2} onChange={handleHeaderChange} className="w-full p-2 bg-slate-50/50 border border-slate-200 rounded-xl text-xs" />
+                      </div>
+                      <div>
+                        <label className="text-teal-600/70 font-bold block mb-1">เวลาสิ้นสุด</label>
+                        <input type="time" name="endTime2" value={headerData.endTime2} onChange={handleHeaderChange} className="w-full p-2 bg-slate-50/50 border border-slate-200 rounded-xl text-xs" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-teal-600/70 font-bold block mb-1">รายชื่อผู้ปฏิบัติงาน วันที่ 2 (ระบุสูงสุด 4 คน)</label>
+                      <div className="grid grid-cols-2 gap-1.5 mt-1">
+                        {[1, 2, 3, 4].map(n => (
+                          <input key={n} list="operators" name={`op2_${n}`} value={headerData[`op2_${n}`]} onChange={handleHeaderChange} placeholder={`ช่างวันที่สอง คนที่ ${n}`} className="p-2 border border-slate-200 rounded-xl text-xs bg-slate-50/50 font-medium" />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+                <div className="space-y-2">
+                  <div className="flex bg-slate-200 p-1 rounded-2xl font-bold text-center text-xs">
+                    <button type="button" onClick={() => setEquipmentTab('WAT')} className={`flex-1 py-2 rounded-xl transition-all ${equipmentTab === 'WAT' ? 'bg-white text-emerald-800 shadow-xs' : 'text-slate-500'}`}>🚰 ตู้ทำน้ำเย็น ({equipments.filter(e => e.category === 'WAT').length})</button>
+                    <button type="button" onClick={() => setEquipmentTab('ICE')} className={`flex-1 py-2 rounded-xl transition-all ${equipmentTab === 'ICE' ? 'bg-white text-emerald-800 shadow-xs' : 'text-slate-500'}`}>🧊 เครื่องทำน้ำแข็ง ({equipments.filter(e => e.category === 'ICE').length})</button>
+                  </div>
+                  <input type="text" placeholder="🔍 ค้นหารหัส, หมายเลขทรัพย์สิน หรือสถานที่ตั้ง..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-medium outline-none" />
+                </div>
+
+                <section className="space-y-3">
+                  {filteredEquipments.map((eq) => {
+                    const currentItemCheck = checklistState[eq.id] || { q1: "ปกติ", q2: "ปกติ", q3: "ปกติ", q4: "ปกติ", q5: "ปกติ", q6_tds: "", q7_filter: "ยังไม่ถึงรอบ", q8: "ปกติ" };
+                    const nextDate = getNextDueDate(eq.lastChange);
+                    const dueAlert = isOverdue(eq.lastChange);
+                    const isCancelled = eq.status === "ยกเลิก";
+
+                    return (
+                      <div key={eq.id} className={`bg-white rounded-2xl p-4 border shadow-xs space-y-3 animate-fadeIn transition-all ${isCancelled ? 'border-red-200 bg-red-50/40 opacity-70' : 'border-slate-200/60'}`}>
+                        <div className="flex justify-between items-start border-b border-slate-100 pb-2">
+                          <div>
+                            <div className="flex items-center space-x-1.5">
+                              <span className="bg-emerald-100 text-emerald-800 text-[11px] font-extrabold px-2.5 py-0.5 rounded-md">{eq.id}</span>
+                              {/* 3. แสดงสถานะการใช้งานบนฟอร์มใบงาน */}
+                              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${isCancelled ? 'bg-red-200 text-red-800' : 'bg-slate-100 text-slate-700'}`}>
+                                {eq.status || 'ใช้งานอยู่'}
+                              </span>
+                            </div>
+                            <h3 className="text-xs font-bold text-slate-800 mt-1">📍 {eq.location}</h3>
+                            {/* 1. แสดงหมายเลขทรัพย์สิน */}
+                            <p className="text-[10px] text-slate-400 font-medium mt-0.5">📋 ทรัพย์สินที่: {eq.assetNo || 'N/A'}</p>
+                          </div>
+                          <div className="text-right text-[10px] text-slate-500 max-w-[160px]">
+                            {/* 4. เปลี่ยนคำศัพท์ตามบรีฟ */}
+                            <p className="font-bold text-slate-700 truncate">⚙️ {eq.type}</p>
+                            <p className="text-[9px] text-slate-400 truncate mt-0.5">ℹ️ {eq.filterType}</p>
+                            {/* 2. ปุ่มแก้ไขรายละเอียดเครื่องจักรในฟอร์มหน้าแรก */}
+                            <button type="button" onClick={() => handleOpenModal(eq)} className="text-[10px] text-blue-600 font-bold bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-100 mt-1.5 hover:bg-blue-100 transition">
+                              ✏️ แก้ไขข้อมูล
+                            </button>
+                          </div>
+                        </div>
+
+                        {isCancelled ? (
+                          <div className="text-center p-2 bg-red-100/50 rounded-xl text-red-700 text-[11px] font-bold border border-dashed border-red-200">
+                            🛑 เครื่องจักรนี้ "ยกเลิก" การใช้งานแล้ว ระบบจะไม่บันทึกข้อมูลส่วนนี้ส่งลงชีต
+                          </div>
+                        ) : (
+                          <div className="space-y-2.5 text-xs">
+                            <div className="flex flex-col space-y-1 bg-slate-50 p-2 rounded-xl border border-slate-100">
+                              <span className="font-medium text-slate-700">1. ตรวจสอบสภาพทั่วไป โครงสร้าง และจุดยึดแน่นต่างๆ (แน่นหนา/สะอาด)</span>
+                              <div className="flex space-x-2 mt-0.5">
+                                {["ปกติ", "ไม่ปกติ"].map(v => (
+                                  <button key={v} type="button" onClick={() => handleChecklistChange(eq.id, 'q1', v)} className={`flex-1 py-1 rounded-lg font-bold text-[10px] border ${currentItemCheck.q1 === v ? 'bg-slate-700 text-white border-slate-700' : 'bg-white text-slate-500'}`}>{v === 'ปกติ' ? '🟢 แน่นหนา/สะอาด' : '🔴 ชำรุด'}</button>
+                                ))}
+                              </div>
+                            </div>
+
+                            <div className="flex flex-col space-y-1 bg-slate-50 p-2 rounded-xl border border-slate-100">
+                              <span className="font-medium text-slate-700">2. ตรวจสอบการรั่วซึมของข้อต่อ สายน้ำ และกระบอกกรองทุกจุด (ไม่รั่วซึม)</span>
+                              <div className="flex space-x-2 mt-0.5">
+                                {["ปกติ", "ไม่ปกติ"].map(v => (
+                                  <button key={v} type="button" onClick={() => handleChecklistChange(eq.id, 'q2', v)} className={`flex-1 py-1 rounded-lg font-bold text-[10px] border ${currentItemCheck.q2 === v ? 'bg-slate-700 text-white border-slate-700' : 'bg-white text-slate-500'}`}>{v === 'ปกติ' ? '🟢 ไม่รั่วซึม' : '🔴 พบจุดรั่วซึม'}</button>
+                                ))}
+                              </div>
+                            </div>
+
+                            {eq.hasPump && (
+                              <div className="flex flex-col space-y-1 bg-slate-50 p-2 rounded-xl border border-slate-100">
+                                <span className="font-medium text-emerald-800">3. ปั๊มน้ำกรอง (เดินเงียบ/ไม่รั่ว)</span>
+                                <div className="flex space-x-2 mt-0.5">
+                                  {["ปกติ", "ไม่ปกติ"].map(v => (
+                                    <button key={v} type="button" onClick={() => handleChecklistChange(eq.id, 'q3', v)} className={`flex-1 py-1 rounded-lg font-bold text-[10px] border ${currentItemCheck.q3 === v ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-500'}`}>{v === 'ปกติ' ? '🟢 เดินเงียบ/ไม่รั่ว' : '🔴 ผิดปกติ'}</button>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            <div className="flex flex-col space-y-1 bg-slate-50 p-2 rounded-xl border border-slate-100">
+                              <span className="font-medium text-slate-700">4. ทดสอบไฟฟ้ารั่ว (กดปุ่ม ELCB / ไขควงเช็คไฟ)</span>
+                              <div className="flex space-x-2 mt-0.5">
+                                {["ปกติ", "ไม่ปกติ"].map(v => (
+                                  <button key={v} type="button" onClick={() => handleChecklistChange(eq.id, 'q4', v)} className={`flex-1 py-1 rounded-lg font-bold text-[10px] border ${currentItemCheck.q4 === v ? 'bg-slate-700 text-white border-slate-700' : 'bg-white text-slate-500'}`}>{v === 'ปกติ' ? '🟢 ปลอดภัย/ผ่าน' : '🔴 ไฟฟ้ารั่ว'}</button>
+                                ))}
+                              </div>
+                            </div>
+
+                            <div className="flex flex-col space-y-1 bg-slate-50 p-2 rounded-xl border border-slate-100">
+                              <span className="font-medium text-slate-700">5. ระบบทำความเย็น/ร้อน (ทำงานปกติ)</span>
+                              <div className="flex space-x-2 mt-0.5">
+                                {["ปกติ", "ไม่ปกติ"].map(v => (
+                                  <button key={v} type="button" onClick={() => handleChecklistChange(eq.id, 'q5', v)} className={`flex-1 py-1 rounded-lg font-bold text-[10px] border ${currentItemCheck.q5 === v ? 'bg-slate-700 text-white border-slate-700' : 'bg-white text-slate-500'}`}>{v === 'ปกติ' ? '🟢 ทำงานปกติ' : '🔴 ไม่เย็น/ไม่ร้อน'}</button>
+                                ))}
+                              </div>
+                            </div>
+
+                            <div className="bg-slate-50 p-2 rounded-xl border border-slate-100 space-y-1">
+                              <span className="font-medium text-slate-700">6. ตรวจสอบค่า TDS (ระบุค่าหน่วย ppm)</span>
+                              <input type="number" placeholder="พิมพ์ค่าตัวเลข TDS เช่น 45" value={currentItemCheck.q6_tds || ""} onChange={(e) => handleChecklistChange(eq.id, 'q6_tds', e.target.value)} className="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs" />
+                            </div>
+
+                            <div className="bg-slate-50 p-2 rounded-xl border border-slate-100 space-y-1">
+                              <span className="font-medium text-slate-700">7. เปลี่ยนไส้กรองน้ำตามรอบกำหนดมาตรฐาน</span>
+                              <div className="flex space-x-2 mt-0.5">
+                                {["เปลี่ยน", "ยังไม่ถึงรอบ"].map(v => (
+                                  <button key={v} type="button" onClick={() => handleChecklistChange(eq.id, 'q7_filter', v)} className={`flex-1 py-1 rounded-lg font-bold text-[10px] border ${currentItemCheck.q7_filter === v ? 'bg-amber-600 text-white border-amber-600' : 'bg-white text-slate-500'}`}>{v === 'เปลี่ยน' ? '🧼 เปลี่ยนไส้กรอง' : '⏳ ยังไม่ถึงรอบ'}</button>
+                                ))}
+                              </div>
+                            </div>
+
+                            <div className="flex flex-col space-y-1 bg-slate-50 p-2 rounded-xl border border-slate-100">
+                              <span className="font-medium text-slate-700">8. ล้างทำความสะอาดถังพัก / ตู้ / หัวก๊อก (ทำทุก 3 เดือน)</span>
+                              <div className="flex space-x-2 mt-0.5">
+                                {["ปกติ", "ไม่ปกติ"].map(v => (
+                                  <button key={v} type="button" onClick={() => handleChecklistChange(eq.id, 'q8', v)} className={`flex-1 py-1 rounded-lg font-bold text-[10px] border ${currentItemCheck.q8 === v ? 'bg-slate-700 text-white border-slate-700' : 'bg-white text-slate-500'}`}>{v === 'ปกติ' ? '🟢 ล้างทำสะอาดแล้ว' : '🔴 ยังไม่ได้ล้าง'}</button>
+                                ))}
+                              </div>
+                            </div>
+
+                            <div className="mt-2 pt-2 border-t border-dashed border-slate-200 text-[10px] space-y-1 text-slate-600 font-medium">
+                              <div className="flex justify-between">
+                                <span>📅 วันที่เปลี่ยนล่าสุด (ดึงข้อมูลเก่า):</span>
+                                <span className="text-slate-900 font-bold">{eq.lastChange}</span>
+                              </div>
+                              <div className="flex justify-between items-center">
+                                <span>⏳ กำหนดเปลี่ยนครั้งถัดไป (+3ด.):</span>
+                                <span className={`font-bold px-1.5 py-0.5 rounded ${dueAlert ? 'bg-rose-100 text-rose-700 animate-pulse' : 'text-slate-800 bg-slate-100'}`}>
+                                  {nextDate} {dueAlert && "⚠️ เลยกำหนด"}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </section>
+
+                <section className="bg-white p-4 rounded-3xl shadow-xs border border-slate-200/50 space-y-3 text-xs">
+                  <div className="font-bold text-slate-500 uppercase tracking-wider">📌 สรุปผลการ PM ภาพรวมของระบบ</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button type="button" onClick={() => setHeaderData(p => ({ ...p, overallStatus: "ปกติ" }))} className={`p-2.5 rounded-xl border font-bold text-center transition-all ${headerData.overallStatus === 'ปกติ' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-500'}`}>🟢 ปกติพร้อมใช้</button>
+                    <button type="button" onClick={() => setHeaderData(p => ({ ...p, overallStatus: "ไม่ปกติ" }))} className={`p-2.5 rounded-xl border font-bold text-center transition-all ${headerData.overallStatus === 'ไม่ปกติ' ? 'bg-rose-600 text-white border-rose-600' : 'bg-white text-slate-500'}`}>🔴 ต้องซ่อมปรับปรุง</button>
+                  </div>
+                  <div>
+                    <label className="text-slate-400 font-bold block mb-1">กล่องใส่ข้อความรายงานสรุปเพิ่มเติม</label>
+                    <textarea name="summaryText" value={headerData.summaryText} onChange={handleHeaderChange} rows="3" placeholder="พิมพ์ข้อมูลรายงาน สรุปผลการ PM ยื่นต่อหัวหน้า..." className="w-full p-2.5 border border-slate-200 bg-slate-50/50 rounded-xl outline-none text-xs" />
+                  </div>
+                </section>
+
+                <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-xs">
+                  <button type="submit" disabled={isSubmitting} className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center space-x-2">
+                    <span>{isSubmitting ? "🚀 กำลังนำส่งเข้าระบบชีท..." : "💾 หน้าสุดท้าย: ยืนยันการส่งข้อมูล"}</span>
+                  </button>
+                </div>
+
+              </form>
+            </main>
+          )}
+
+          {/* ================= VIEW 2: HISTORY VIEW ================= */}
+          {currentView === 'history' && (
+            <main className="p-4 space-y-4 flex-1 animate-fadeIn">
+              <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-xs space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-extrabold text-slate-800">📊 ทะเบียนประวัติและสถานะเครื่องจักร</h3>
+                  <span className="bg-slate-100 text-slate-700 text-[10px] font-bold px-2 py-0.5 rounded-full">รวม {equipments.length} จุด</span>
+                </div>
+                <p className="text-[11px] text-slate-500 leading-relaxed">ข้อมูลแสดงทะเบียนตู้ทำน้ำเย็น และเครื่องทำน้ำแข็งพร้อมการแจ้งเตือนคำนวณไตรมาสอัตโนมัติจากฐานข้อมูลกลาง</p>
+                <input type="text" placeholder="🔍 ค้นหาในประวัติเครื่องจักร..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none" />
+              </div>
+
+              <div className="space-y-2">
+                {equipments.filter(e => 
+                  e.id.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                  e.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  (e.assetNo && e.assetNo.toLowerCase().includes(searchQuery.toLowerCase()))
+                ).map((eq) => {
+                  const nDate = getNextDueDate(eq.lastChange);
+                  const isOver = isOverdue(eq.lastChange);
+                  const isCancelled = eq.status === "ยกเลิก";
+
+                  return (
+                    <div key={eq.id} className={`border rounded-2xl p-3 shadow-xs flex flex-col space-y-2 transition-all ${isCancelled ? 'bg-red-50/40 border-red-200 opacity-80' : 'bg-white border-slate-100'}`}>
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center space-x-2">
+                          <span className="text-xs font-bold px-2 py-0.5 rounded bg-slate-800 text-white">{eq.id}</span>
+                          <span className="text-xs font-bold text-slate-800">📍 {eq.location}</span>
+                          {/* 3. ปุ่มสถานะการใช้งานในแถวประวัติ */}
+                          <span className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded-full ${isCancelled ? 'bg-red-200 text-red-800' : 'bg-emerald-100 text-emerald-800'}`}>
+                            {eq.status || 'ใช้งานอยู่'}
+                          </span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${eq.category === 'WAT' ? 'bg-blue-50 text-blue-700' : 'bg-amber-50 text-amber-700'}`}>
+                            {eq.category === 'WAT' ? 'ตู้ทำน้ำเย็น' : 'เครื่องทำน้ำแข็ง'}
+                          </span>
+                          {/* 2. ปุ่มแก้ไขเมื่อต้องการปรับแต่ง Master ข้อมูลเครื่องจักร */}
+                          <button type="button" onClick={() => handleOpenModal(eq)} className="text-blue-600 font-bold hover:underline text-[11px]">✏️ แก้ไข</button>
+                        </div>
+                      </div>
+                      
+                      {/* 4. ปรับแก้คำศัพท์ "ชื่อเครื่องจักร" และ "รายละเอียดเครื่องจักร" */}
+                      <div className="text-[11px] text-slate-600 bg-slate-50/70 p-2 rounded-xl border border-slate-100 space-y-1">
+                        <div><span className="text-slate-400 font-semibold">1. หมายเลขทรัพย์สิน:</span> <span className="font-bold text-slate-800">{eq.assetNo || 'N/A'}</span></div>
+                        <div><span className="text-slate-400 font-semibold">ชื่อเครื่องจักร:</span> {eq.type}</div>
+                        <div><span className="text-slate-400 font-semibold">รายละเอียดเครื่องจักร:</span> {eq.filterType}</div>
+                        <div className="flex justify-between border-t border-slate-200/60 pt-1 mt-1 text-[10px]">
+                          <div><span className="text-slate-400 font-semibold">ล้างกรองล่าสุด:</span> <span className="text-slate-800 font-bold">{eq.lastChange}</span></div>
+                          <div><span className="text-slate-400 font-semibold">ดีเดย์เปลี่ยนถัดไป:</span> <span className={`font-bold ${isOver ? 'text-red-600' : 'text-emerald-700'}`}>{nDate}</span></div>
+                        </div>
+                      </div>
+
+                      {isOver && !isCancelled && (
+                        <div className="bg-rose-50 text-rose-800 text-[10px] px-2.5 py-1 rounded-xl font-bold flex items-center border border-rose-200">
+                          ⚠️ ถึงกำหนดแจ้งเตือนเปลี่ยนไส้กรองประจำไตรมาสแล้ว!
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </main>
+          )}
+
+          <footer className="text-center text-[10px] text-slate-400 font-medium mt-auto pt-6">
+            <p>© 2026 CP ALL PUBLIC COMPANY LIMITED • ENGINEERING SYSTEM</p>
+          </footer>
+
+          {/* ================= 📦 POPUP MODAL: กล่องสำหรับ (2) เพิ่ม และ แก้ไขเครื่องจักร ================= */}
+          {isModalOpen && (
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
+              <div className="bg-white rounded-3xl w-full max-w-sm shadow-xl border border-slate-100 overflow-hidden text-xs text-slate-800">
+                <div className="bg-slate-900 text-white p-4 flex justify-between items-center">
+                  <h3 className="font-bold text-sm">{isEditMode ? "✏️ แก้ไขข้อมูลเครื่องจักร" : "➕ เพิ่มเครื่องจักรชุดใหม่"}</h3>
+                  <button type="button" onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-white font-bold text-lg">&times;</button>
+                </div>
+                
+                <form onSubmit={handleSaveEquipment} className="p-4 space-y-3.5">
+                  <div>
+                    <label className="block text-slate-500 font-bold mb-1">รหัสอุปกรณ์ (ID) *ห้ามซ้ำ</label>
+                    <input type="text" placeholder="เช่น WAT-14 หรือ ICE-4" value={modalData.id} onChange={(e) => setModalData({...modalData, id: e.target.value.toUpperCase().trim()})} disabled={isEditMode} required className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-bold disabled:bg-slate-200"/>
+                  </div>
+                  
+                  {/* 1. หมายเลขทรัพย์สิน */}
+                  <div>
+                    <label className="block text-slate-500 font-bold mb-1">1. หมายเลขทรัพย์สิน (Asset No.)</label>
+                    <input type="text" placeholder="ระบุรหัสทรัพย์สินของบริษัท" value={modalData.assetNo} onChange={(e) => setModalData({...modalData, assetNo: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-semibold"/>
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-500 font-bold mb-1">📍 สถานที่ตั้งย่อย</label>
+                    <input type="text" placeholder="เช่น ประตู48 หรือ ห้องพยาบาล" value={modalData.location} onChange={(e) => setModalData({...modalData, location: e.target.value})} required className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-medium"/>
+                  </div>
+
+                  {/* 4. เปลี่ยนเป็น ชื่อเครื่องจักร */}
+                  <div>
+                    <label className="block text-slate-500 font-bold mb-1">4. ชื่อเครื่องจักร</label>
+                    <input type="text" placeholder="เช่น ตู้ทำน้ำเย็น 4 หัวก๊อก" value={modalData.type} onChange={(e) => setModalData({...modalData, type: e.target.value})} required className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-semibold"/>
+                  </div>
+
+                  {/* 4. เปลี่ยนเป็น รายละเอียดเครื่องจักร */}
+                  <div>
+                    <label className="block text-slate-500 font-bold mb-1">4. รายละเอียดเครื่องจักร</label>
+                    <input type="text" placeholder="เช่น RO 20 นิ้ว 5 ขั้นตอน" value={modalData.filterType} onChange={(e) => setModalData({...modalData, filterType: e.target.value})} required className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2"/>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-slate-500 font-bold mb-1">หมวดหมู่</label>
+                      <select value={modalData.category} onChange={(e) => setModalData({...modalData, category: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2 py-2 font-semibold">
+                        <option value="WAT">🚰 ตู้ทำน้ำเย็น</option>
+                        <option value="ICE">🧊 เครื่องทำน้ำแข็ง</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-slate-500 font-bold mb-1">วันที่เปลี่ยนล่าสุด</label>
+                      <input type="date" value={modalData.lastChange} onChange={(e) => setModalData({...modalData, lastChange: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2 py-2 text-[11px] font-semibold"/>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-2 py-1 bg-slate-50 px-3 rounded-xl border border-slate-100">
+                    <input type="checkbox" id="modalHasPump" checked={modalData.hasPump} onChange={(e) => setModalData({...modalData, hasPump: e.target.checked})} className="w-4 h-4 text-emerald-600 border-slate-300 rounded focus:ring-emerald-500"/>
+                    <label htmlFor="modalHasPump" className="text-[11px] text-slate-700 font-bold">มีระบบปั๊มน้ำกรองในตัว</label>
+                  </div>
+
+                  {/* 3. ปุ่มสถานะการใช้งาน: ใช้งานอยู่ / ยกเลิก */}
+                  <div>
+                    <label className="block text-slate-500 font-bold mb-1">3. สถานะการใช้งาน</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button type="button" onClick={() => setModalData({...modalData, status: "ใช้งานอยู่"})} className={`py-2 rounded-xl font-bold text-center border transition-all ${modalData.status === 'ใช้งานอยู่' ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>ใช้งานอยู่</button>
+                      <button type="button" onClick={() => setModalData({...modalData, status: "ยกเลิก"})} className={`py-2 rounded-xl font-bold text-center border transition-all ${modalData.status === 'ยกเลิก' ? 'bg-rose-600 text-white border-rose-600 shadow-xs' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>ยกเลิก</button>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 flex space-x-2 justify-end text-[11px]">
+                    <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 border border-slate-200 rounded-xl text-slate-500 hover:bg-slate-50 font-bold">ปิด</button>
+                    <button type="submit" className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold shadow-xs">💾 บันทึกข้อมูล</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          <datalist id="assigners">{assignerList.map((n, i) => <option key={i} value={n} />)}</datalist>
+          <datalist id="operators">{operatorList.map((n, i) => <option key={i} value={n} />)}</datalist>
+
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
