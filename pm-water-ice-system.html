@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Check Sheet PM - ระบบกรองน้ำและทำน้ำแข็ง</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Anuphan:wght@300;400;500;600;700&display=swap');
+    body {
+      font-family: 'Anuphan', sans-serif;
+    }
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fadeIn {
+      animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen pb-12">
+
+  <div id="root">
+    <div class="flex items-center justify-center min-h-screen">
+      <div class="text-center p-6 bg-white rounded-2xl shadow-sm max-w-xs border border-slate-100">
+        <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-emerald-500 border-t-transparent mb-3"></div>
+        <p class="text-xs font-bold text-slate-500 animate-pulse">กำลังซิงค์ข้อมูลเครื่องจักรล่าสุดจาก Google Sheet...</p>
+      </div>
+    </div>
+  </div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo } = React;
+
+    // 🔗 เปลี่ยนตรงนี้เป็นลิงก์ Google Web App API ตัวล่าสุดของคุณ
+    const GOOGLE_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzuk8T8n5EDERAgdjW36fQhFlGCgDazoVpQa_MoxJL-7YjL2TxtSge-yahPPHPUohaKoA/exec";
+
+    // ข้อมูลสำรองกรณีกูเกิลชีทขัดข้องออฟไลน์
+    const fallbackEquipments = [
+      { id: 'WAT-01', assetNo: 'N/A', location: 'ประตู48', type: 'ตู้ทำน้ำเย็น 4 หัวก๊อก', filterType: 'RO 20 นิ้ว 6 ขั้นตอน 300 GPD', hasPump: true, lastChange: '2026-03-01', category: 'WAT', status: 'ใช้งานอยู่' },
+      { id: 'ICE-1', assetNo: 'N/A', location: 'โรงอาหาร ชั้น 2 ข้างร้านน้ำ', type: 'เครื่องทำน้ำแข็ง', filterType: 'UF 150 GPD', hasPump: false, lastChange: '2026-02-18', category: 'ICE', status: 'ใช้งานอยู่' }
+    ];
+
+    function App() {
+      const assignerList = ["เกรียงศักดิ์", "ณรงค์", "รัฐชานนท์"];
+      const operatorList = ["ณรงค์", "รัฐชานนท์", "บัญชา", "วสุพล", "ศรายุทธ", "พิพัฒน์", "ศรราม เอี่ยมอาจ", "วงศธร", "เกรียงศักดิ์"];
+      const locations = ["อาคาร DC", "อาคารโรงอาหารผู้รับเหมา"];
+      const todayStr = new Date().toISOString().split('T')[0];
+
+      const [isLoading, setIsLoading] = useState(true);
+      const [currentView, setCurrentView] = useState('form');
+      const [equipmentTab, setEquipmentTab] = useState('WAT');
+      const [equipments, setEquipments] = useState([]);
+      const [checklistState, setChecklistState] = useState({});
+
+      const [headerData, setHeaderData] = useState({
+        location: "อาคาร DC",
+        assigner: "เกรียงศักดิ์",
+        overallStatus: "ปกติ",
+        summaryText: "",
+        pmDate1: todayStr, startTime1: "", endTime1: "",
+        op1_1: "", op1_2: "", op1_3: "", op1_4: ""
+      });
+
+      const [searchQuery, setSearchQuery] = useState("");
+      const [isSubmitting, setIsSubmitting] = useState(false);
+      const [submitStage, setSubmitStage] = useState('idle'); 
+      const [alertMsg, setAlertMsg] = useState("");
+
+      useEffect(() => {
+        async function fetchLatestEquipments() {
+          try {
+            const response = await fetch(GOOGLE_WEB_APP_URL);
+            if (!response.ok) throw new Error("Network error");
+            const cloudData = await response.json();
+            
+            if (Array.isArray(cloudData) && cloudData.length > 0) {
+              initSystemData(cloudData);
+            } else {
+              initSystemData(fallbackEquipments);
+            }
+          } catch (err) {
+            console.error("ใช้ข้อมูลออฟไลน์:", err);
+            initSystemData(fallbackEquipments);
+            setAlertMsg("⚠️ ใช้งานโหมดสำรอง (เนื่องจากไม่สามารถดึงข้อมูลปัจจุบันจากชีตได้)");
+          } finally {
+            setIsLoading(false);
+          }
+        }
+        fetchLatestEquipments();
+      }, []);
+
+      function initSystemData(dataList) {
+        setEquipments(dataList);
+        const initialStates = {};
+        dataList.forEach(eq => {
+          initialStates[eq.id] = {
+            q1: "ปกติ", q2: "ปกติ", q3: eq.hasPump ? "ปกติ" : "-", q4: "ปกติ", q5: "ปกติ",
+            q6_tds: "", q7_filter: "ยังไม่ถึงรอบ", q8: "ปกติ"
+          };
+        });
+        setChecklistState(initialStates);
+      }
+
+      const getNextDueDate = (dateStr) => {
+        if (!dateStr) return "";
+        const d = new Date(dateStr);
+        d.setMonth(d.getMonth() + 3);
+        return d.toISOString().split('T')[0];
+      };
+
+      const isOverdue = (dateStr) => {
+        const nextDate = getNextDueDate(dateStr);
+        if (!nextDate) return false;
+        return new Date(nextDate) <= new Date();
+      };
+
+      const handleHeaderChange = (e) => {
+        const { name, value } = e.target;
+        setHeaderData(prev => ({ ...prev, [name]: value }));
+      };
+
+      const handleChecklistChange = (id, field, value) => {
+        setChecklistState(prev => ({
+          ...prev,
+          [id]: { ...prev[id], [field]: value }
+        }));
+      };
+
+      const handleFormSubmit = async (e) => {
+        e.preventDefault();
+        setAlertMsg("");
+
+        if (!headerData.startTime1 || !headerData.endTime1 || !headerData.op1_1) {
+          setAlertMsg("⚠️ กรุณากรอกเวลางานและช่างผู้ปฏิบัติงานหลักให้เรียบร้อยก่อนส่ง");
+          window.scrollTo({ top: 0, behavior: "smooth" });
+          return;
+        }
+
+        setIsSubmitting(true);
+        setSubmitStage('sending');
+
+        try {
+          // กรองเอาเฉพาะข้อมูลเครื่องจักรที่ไม่ได้ยกเลิก และมีการกรอกตรวจเช็ค
+          const activeChecklist = {};
+          equipments.forEach(eq => {
+            if (eq.status !== "ยกเลิก" && checklistState[eq.id]) {
+              activeChecklist[eq.id] = checklistState[eq.id];
+            }
+          });
+
+          const payload = {
+            metadata: headerData,
+            checklist: activeChecklist
+          };
+
+          await fetch(GOOGLE_WEB_APP_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({ data: JSON.stringify(payload) })
+          });
+
+          setSubmitStage('success');
+          setAlertMsg("🎉 บันทึกประวัติลง Google Sheet แบบเรียงแถวเรียบร้อยแล้ว!");
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        } catch (err) {
+          setSubmitStage('error');
+          setAlertMsg("❌ ไม่สามารถเชื่อมต่อฐานข้อมูลชีตได้");
+        } finally {
+          setIsSubmitting(false);
+        }
+      };
+
+      const filteredEquipments = useMemo(() => {
+        return equipments.filter(eq => eq.category === equipmentTab && (
+          eq.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          eq.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          eq.filterType.toLowerCase().includes(searchQuery.toLowerCase())
+        ));
+      }, [equipments, equipmentTab, searchQuery]);
+
+      if (isLoading) {
+        return (
+          <div className="flex items-center justify-center min-h-screen bg-slate-50">
+            <div className="text-center p-6 bg-white rounded-2xl shadow-sm max-w-xs border border-slate-100 animate-fadeIn">
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-emerald-500 border-t-transparent mb-3"></div>
+              <p className="text-xs font-bold text-slate-500">กำลังดึงฐานข้อมูลเครื่องจักรล่าสุดจากระบบคลาวด์...</p>
+            </div>
+          </div>
+        );
+      }
+
+      return (
+        <div className="max-w-md mx-auto min-h-screen flex flex-col bg-slate-50 shadow-xl relative border border-slate-200/60">
+          
+          {/* Top Header Section */}
+          {/* Header: ส่วนหัวกระดาษตามข้อกำหนดหลัก */}
+            <header className="bg-white shadow-xs border-b-4 border-green-600 sticky top-0 z-30">
+              <div className="p-4">
+                <div className="flex items-center justify-between">
+                  <span className="bg-green-600 text-white text-[10px] font-black px-2 py-0.5 rounded">CP ALL</span>
+                  <span className="text-[10px] text-slate-400 font-bold flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-3 h-3 mr-1">
+                      <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
+                      <line x1="12" y1="18" x2="12.01" y2="18" />
+                    </svg>
+                    ระบบมือถือหน้างาน
+                  </span>
+                </div>
+                <h1 className="text-md font-extrabold text-slate-900 mt-1">บริษัท ซีพีออลล์ จำกัด (มหาชน)</h1>
+                <h2 className="text-xs font-bold text-slate-600 mt-0.5 flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-green-600 mr-1.5 w-3 h-3">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                  </svg>
+                  Check Sheet การบำรุงรักษาเครื่องจักร/อุปกรณ์
+                </h2>
+                <div className="grid grid-cols-3 gap-1 mt-2.5 pt-2 border-t border-slate-100 text-[9px] text-slate-500 font-semibold">
+                  <div>รหัส: <span className="text-slate-800 font-bold">B3-FM-10-01-06</span></div>
+                  <div className="text-center">ปรับปรุงครั้งที่: <span className="text-slate-800 font-bold">0</span></div>
+                  <div className="text-right">ประกาศใช้: <span className="text-slate-800 font-bold">1 เม.ย. 2560</span></div>
+                </div>
+              </div>
+            </header>
+
+
+          {alertMsg && (
+            <div className="px-4 pt-4 animate-fadeIn">
+              <div className={`p-3.5 rounded-2xl text-xs font-bold text-center border-2 ${submitStage === 'error' ? 'bg-red-50 border-red-300 text-red-800' : 'bg-green-50 border-green-300 text-green-800'}`}>
+                {alertMsg}
+              </div>
+            </div>
+          )}
+
+          {/* ================= VIEW 1: FORM ================= */}
+          {currentView === 'form' && (
+            <main className="p-4 space-y-4 flex-1 animate-fadeIn">
+              <form onSubmit={handleFormSubmit} className="space-y-4">
+                
+                {/* ================= กล่องข้อมูลพื้นฐานสไตล์ระบบตรวจแก๊ส ================= */}
+<section className="bg-white rounded-3xl p-5 shadow-xs border border-slate-100 space-y-3 text-xs">
+  <div className="flex items-center text-emerald-700 font-bold border-b pb-2 text-sm">
+    <span>📊 รายละเอียดแผนงานระบบกรองน้ำและน้ำแข็ง</span>
+  </div>
+  
+  <div className="grid grid-cols-2 gap-3">
+    <div className="col-span-2">
+      <span className="text-slate-400 font-semibold">เครื่องจักร/อุปกรณ์</span>
+      <p className="font-bold text-slate-800 mt-1 px-3 py-2 bg-slate-50 rounded-xl border border-slate-100">ตู้น้ำดื่มและเครื่องทำน้ำแข็ง</p>
+    </div>
+    <div>
+      <span className="text-slate-400 font-semibold">ความถี่การตรวจเช็ค</span>
+      <p className="font-bold text-slate-800 mt-1 px-3 py-2 bg-slate-50 rounded-xl border border-slate-100">รอบประจำเดือน/ไตรมาส</p>
+    </div>
+    <div>
+      <span className="text-slate-400 font-semibold">สถานที่ปฏิบัติงานหลัก</span>
+      <select name="location" value={headerData.location} onChange={handleHeaderChange} className="w-full font-bold text-slate-800 mt-1 px-3 py-2.5 bg-slate-50 rounded-xl border border-slate-100 outline-none focus:ring-2 focus:ring-emerald-500">
+        {locations.map((loc, idx) => <option key={idx} value={loc}>{loc}</option>)}
+      </select>
+    </div>
+  </div>
+
+  {/* ส่วนจัดการวัน เวลา และบุคลากร */}
+  <div className="pt-2 border-t border-slate-100 space-y-3">
+    <div>
+      <label className="font-bold text-slate-500 block">📅 วันที่ทำ PM</label>
+      <input type="date" name="pmDate1" value={headerData.pmDate1} onChange={handleHeaderChange} className="w-full mt-1 p-2.5 border rounded-xl bg-slate-50/50 text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-500" />
+    </div>
+    
+    <div className="grid grid-cols-2 gap-2">
+      <div>
+        <label className="font-bold text-slate-500 block">⏰ เวลาเริ่ม</label>
+        <input type="time" name="startTime1" value={headerData.startTime1} onChange={handleHeaderChange} className="w-full mt-1 p-2.5 border rounded-xl bg-slate-50/50 text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-500" />
+      </div>
+      <div>
+        <label className="font-bold text-slate-500 block">⏰ เวลาสิ้นสุด</label>
+        <input type="time" name="endTime1" value={headerData.endTime1} onChange={handleHeaderChange} className="w-full mt-1 p-2.5 border rounded-xl bg-slate-50/50 text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-500" />
+      </div>
+    </div>
+    
+    <div>
+      <label className="font-bold text-slate-500 block">👤 ผู้มอบหมายงาน</label>
+      <input list="assigners" name="assigner" value={headerData.assigner} onChange={handleHeaderChange} className="w-full mt-1 p-2.5 border rounded-xl bg-slate-50/50 text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-500" />
+    </div>
+    
+    <div>
+      <label className="font-bold text-slate-500 block">👥 รายชื่อผู้ปฏิบัติงาน (สูงสุด 4 คน)</label>
+      <div className="grid grid-cols-2 gap-2 mt-1">
+        {[1, 2, 3, 4].map(n => (
+          <input key={n} list="operators" name={`op1_${n}`} value={headerData[`op1_${n}`]} onChange={handleHeaderChange} placeholder={`ช่างปฏิบัติงานคนที่ ${n}`} className="p-2.5 border rounded-xl text-xs bg-slate-50/50 font-semibold outline-none focus:ring-2 focus:ring-emerald-500" />
+        ))}
+      </div>
+    </div>
+  </div>
+</section>
+
+                {/* แถบคัดกรองประเภทเครื่องจักร */}
+                <div className="space-y-2">
+                  <div className="flex bg-slate-200 p-1 rounded-2xl font-bold text-center text-xs">
+                    <button type="button" onClick={() => setEquipmentTab('WAT')} className={`flex-1 py-2 rounded-xl transition-all ${equipmentTab === 'WAT' ? 'bg-white text-emerald-800 shadow-xs' : 'text-slate-500'}`}>🚰 ตู้ทำน้ำเย็น ({equipments.filter(e => e.category === 'WAT').length})</button>
+                    <button type="button" onClick={() => setEquipmentTab('ICE')} className={`flex-1 py-2 rounded-xl transition-all ${equipmentTab === 'ICE' ? 'bg-white text-emerald-800 shadow-xs' : 'text-slate-500'}`}>🧊 เครื่องทำน้ำแข็ง ({equipments.filter(e => e.category === 'ICE').length})</button>
+                  </div>
+                  <input type="text" placeholder="🔍 ค้นหารหัส หรือ สถานที่ติดตั้งตู้น้ำ..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs outline-none font-medium" />
+                </div>
+
+                {/* รายชื่อตู้น้ำสำหรับลงเช็คลิสต์แยกคอลัมน์ */}
+                <section className="space-y-3">
+                  {filteredEquipments.map((eq) => {
+                    const checkItem = checklistState[eq.id] || { q1: "ปกติ", q2: "ปกติ", q3: "-", q4: "ปกติ", q5: "ปกติ", q6_tds: "", q7_filter: "ยังไม่ถึงรอบ", q8: "ปกติ" };
+                    const nextDate = getNextDueDate(eq.lastChange);
+                    const dueAlert = isOverdue(eq.lastChange);
+                    const isCancelled = eq.status === "ยกเลิก";
+
+                    return (
+                      <div key={eq.id} className={`bg-white rounded-2xl p-4 border shadow-xs space-y-3 animate-fadeIn ${isCancelled ? 'border-red-200 bg-red-50/40 opacity-60' : 'border-slate-200/60'}`}>
+                        <div className="flex justify-between items-start border-b border-slate-100 pb-2">
+                          <div>
+                            <span className="bg-emerald-100 text-emerald-800 text-[11px] font-extrabold px-2 py-0.5 rounded">{eq.id}</span>
+                            <h3 className="text-xs font-bold text-slate-800 mt-1">📍 {eq.location}</h3>
+                            <p className="text-[10px] text-slate-400">ทรัพย์สิน: {eq.assetNo}</p>
+                          </div>
+                          <div className="text-right text-[10px] text-slate-500 max-w-[170px]">
+                            <p className="font-bold text-slate-700 truncate">{eq.type}</p>
+                            <p className="text-[9px] text-slate-400 truncate">{eq.filterType}</p>
+                          </div>
+                        </div>
+
+                        {!isCancelled && (
+                          <div className="space-y-2.5 text-xs">
+                            {/* ข้อ 1 */}
+<div className="bg-slate-50 p-2 rounded-xl border border-slate-100">
+  <span className="font-medium text-emerald-800">1. สภาพโครงสร้างตู้และจุดยึดต่างๆ (แน่นหนา/สะอาด)</span>
+  <div className="flex space-x-2 mt-1">
+    {["ปกติ", "ไม่ปกติ"].map(v => (
+      <button key={v} type="button" onClick={() => handleChecklistChange(eq.id, 'q1', v)} className={`flex-1 py-1 rounded-lg font-bold text-[10px] border ${checkItem.q1 === v ? 'bg-emerald-600 text-white' : 'bg-white text-slate-500'}`}>{v === 'ปกติ' ? '🟢 ปกติ' : '🔴 ชำรุด'}</button>
+    ))}
+  </div>
+</div>
+
+{/* ข้อ 2 */}
+<div className="bg-slate-50 p-2 rounded-xl border border-slate-100">
+  <span className="font-medium text-emerald-800">2. การรั่วซึมของข้อต่อ สายน้ำ และกระบอกกรอง</span>
+  <div className="flex space-x-2 mt-1">
+    {["ปกติ", "ไม่ปกติ"].map(v => (
+      <button key={v} type="button" onClick={() => handleChecklistChange(eq.id, 'q2', v)} className={`flex-1 py-1 rounded-lg font-bold text-[10px] border ${checkItem.q2 === v ? 'bg-emerald-600 text-white' : 'bg-white text-slate-500'}`}>{v === 'ปกติ' ? '🟢 ไม่รั่วซึม' : '🔴 รั่วซึม'}</button>
+    ))}
+  </div>
+</div>
+
+{/* ข้อ 3 */}
+{eq.hasPump && (
+  <div className="bg-slate-50 p-2 rounded-xl border border-slate-100">
+    <span className="font-medium text-emerald-800">3. ระบบปั๊มน้ำกรอง (เดินเงียบ/แรงดันปกติ)</span>
+    <div className="flex space-x-2 mt-1">
+      {["ปกติ", "ไม่ปกติ"].map(v => (
+        <button key={v} type="button" onClick={() => handleChecklistChange(eq.id, 'q3', v)} className={`flex-1 py-1 rounded-lg font-bold text-[10px] border ${checkItem.q3 === v ? 'bg-emerald-600 text-white' : 'bg-white text-slate-500'}`}>{v === 'ปกติ' ? '🟢 เดินเงียบ' : '🔴 ผิดปกติ'}</button>
+      ))}
+    </div>
+  </div>
+)}
+
+{/* ข้อ 4 */}
+<div className="bg-slate-50 p-2 rounded-xl border border-slate-100">
+  <span className="font-medium text-emerald-800">4. ตรวจสอบระบบไฟฟ้ารั่ว (ปุ่มทดสอบ ELCB)</span>
+  <div className="flex space-x-2 mt-1">
+    {["ปกติ", "ไม่ปกติ"].map(v => (
+      <button key={v} type="button" onClick={() => handleChecklistChange(eq.id, 'q4', v)} className={`flex-1 py-1 rounded-lg font-bold text-[10px] border ${checkItem.q4 === v ? 'bg-emerald-600 text-white' : 'bg-white text-slate-500'}`}>{v === 'ปกติ' ? '🟢 ปลอดภัย' : '🔴 ไฟรั่ว'}</button>
+    ))}
+  </div>
+</div>
+
+{/* ข้อ 5 */}
+<div className="bg-slate-50 p-2 rounded-xl border border-slate-100">
+  <span className="font-medium text-emerald-800">5. ระบบการทำงานของคอมเพรสเซอร์ทำความเย็น/ร้อน</span>
+  <div className="flex space-x-2 mt-1">
+    {["ปกติ", "ไม่ปกติ"].map(v => (
+      <button key={v} type="button" onClick={() => handleChecklistChange(eq.id, 'q5', v)} className={`flex-1 py-1 rounded-lg font-bold text-[10px] border ${checkItem.q5 === v ? 'bg-emerald-600 text-white' : 'bg-white text-slate-500'}`}>{v === 'ปกติ' ? '🟢 ทำงานปกติ' : '🔴 ไม่เย็น/ไม่ร้อน'}</button>
+    ))}
+  </div>
+</div>
+
+{/* ข้อ 6 */}
+<div className="bg-slate-50 p-2 rounded-xl border border-slate-100">
+  <span className="font-medium text-slate-700">6. ตรวจวัดคุณภาพน้ำด้วยน้ำยา/เครื่องวัด TDS (ppm)</span>
+  <input type="number" placeholder="เช่น 35" value={checkItem.q6_tds} onChange={(e) => handleChecklistChange(eq.id, 'q6_tds', e.target.value)} className="w-full p-2 mt-1 bg-white border rounded-lg text-xs font-bold" />
+</div>
+
+{/* ข้อ 7 */}
+<div className="bg-slate-50 p-2 rounded-xl border border-slate-100">
+  <span className="font-medium text-slate-700">7. ผลการบำรุงรักษาเปลี่ยนไส้กรองรอบนี้</span>
+  <div className="flex space-x-2 mt-1">
+    {["เปลี่ยน", "ยังไม่ถึงรอบ"].map(v => (
+      <button key={v} type="button" onClick={() => handleChecklistChange(eq.id, 'q7_filter', v)} className={`flex-1 py-1 rounded-lg font-bold text-[10px] border ${checkItem.q7_filter === v ? 'bg-amber-600 text-white' : 'bg-white text-slate-500'}`}>{v === 'เปลี่ยน' ? '🧼 เปลี่ยนไส้กรอง' : '⏳ ยังไม่ถึงรอบ'}</button>
+    ))}
+  </div>
+</div>
+
+{/* ข้อ 8 */}
+<div className="bg-slate-50 p-2 rounded-xl border border-slate-100">
+  <span className="font-medium text-emerald-800">8. การล้างทำความสะอาดตู้/ถังพักน้ำหัวก๊อก (ประจำ 3 เดือน)</span>
+  <div className="flex space-x-2 mt-1">
+    {["ปกติ", "ไม่ปกติ"].map(v => (
+      <button key={v} type="button" onClick={() => handleChecklistChange(eq.id, 'q8', v)} className={`flex-1 py-1 rounded-lg font-bold text-[10px] border ${checkItem.q8 === v ? 'bg-emerald-600 text-white' : 'bg-white text-slate-500'}`}>{v === 'ปกติ' ? '🟢 ล้างเรียบร้อย' : '🔴 ยังไม่ได้ล้าง'}</button>
+    ))}
+  </div>
+</div>
+
+                            <div className="pt-2 border-t border-dashed text-[10px] text-slate-500 flex justify-between font-medium">
+                              <span>เปลี่ยนไส้กรองล่าสุด: {eq.lastChange}</span>
+                              <span className={`font-bold ${dueAlert ? 'text-red-500 animate-pulse' : ''}`}>ดีเดย์รอบถัดไป: {nextDate}</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </section>
+
+                {/* รายงานภาพรวมสรุปท้ายใบงาน */}
+                <section className="bg-white p-4 rounded-3xl shadow-xs border border-slate-200/50 space-y-3 text-xs">
+                  <div className="font-bold text-slate-500 uppercase tracking-wider">📌 สรุปผลการตรวจบำรุงรักษาภาพรวม</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button type="button" onClick={() => setHeaderData(p => ({ ...p, overallStatus: "ปกติ" }))} className={`p-2.5 rounded-xl border font-bold text-center ${headerData.overallStatus === 'ปกติ' ? 'bg-emerald-600 text-white' : 'bg-white text-slate-500'}`}>🟢 ปกติพร้อมใช้</button>
+                    <button type="button" onClick={() => setHeaderData(p => ({ ...p, overallStatus: "ไม่ปกติ" }))} className={`p-2.5 rounded-xl border font-bold text-center ${headerData.overallStatus === 'ไม่ปกติ' ? 'bg-rose-600 text-white' : 'bg-white text-slate-500'}`}>🔴 ต้องซ่อมแซม</button>
+                  </div>
+                  <div>
+                    <textarea name="summaryText" value={headerData.summaryText} onChange={handleHeaderChange} rows="3" placeholder="ระบุหมายเหตุหรือรายงานปัญหาเพิ่มเติมถึงผู้ควบคุมระบบงาน..." className="w-full p-2.5 border bg-slate-50 rounded-xl outline-none text-xs" />
+                  </div>
+                </section>
+
+                {/* ปุ่มกดยืนยันใบงาน */}
+                <div className="bg-white p-3 rounded-2xl border">
+                  <button type="submit" disabled={isSubmitting} className="w-full py-3.5 bg-emerald-600 text-white text-xs font-bold rounded-xl shadow-md flex items-center justify-center space-x-2 active:scale-95 transition-all">
+                    <span>{isSubmitting ? "🚀 ระบบกำลังบันทึกข้อมูล..." : "💾 ส่งบันทึกประวัติการตรวจเช็ค"}</span>
+                  </button>
+                </div>
+              </form>
+            </main>
+          )}
+
+          {/* ================= VIEW 2: MASTER LIST ================= */}
+          {currentView === 'history' && (
+            <main className="p-4 space-y-3 flex-1 animate-fadeIn">
+              <div className="bg-white p-4 rounded-3xl border shadow-xs">
+                <h3 className="text-sm font-extrabold text-slate-800">📋 รายชื่อเครื่องจักรจากฐานข้อมูลหลัก</h3>
+                <p className="text-[11px] text-slate-400 mt-1">สามารถแก้ไขรหัส สถานที่ตั้ง หรือสเปกตู้ได้โดยตรงผ่าน Google Sheet แท็บ "Master_Equipments"</p>
+                <input type="text" placeholder="🔍 ค้นหารหัส หรือ สถานที่..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full p-2 bg-slate-50 border rounded-xl text-xs mt-3 outline-none" />
+              </div>
+
+              <div className="space-y-2">
+                {equipments.filter(e => e.id.toLowerCase().includes(searchQuery.toLowerCase()) || e.location.toLowerCase().includes(searchQuery.toLowerCase())).map((eq) => (
+                  <div key={eq.id} className="bg-white border rounded-2xl p-3 text-xs space-y-1.5 shadow-2xs">
+                    <div className="flex justify-between items-center">
+                      <span className="bg-slate-900 text-white font-bold px-1.5 py-0.5 rounded text-[10px]">{eq.id}</span>
+                      <span className="text-slate-800 font-bold">📍 {eq.location}</span>
+                      <span className="text-[9px] bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded-full font-bold">{eq.category}</span>
+                    </div>
+                    <div className="bg-slate-50 p-2 rounded-xl text-[11px] text-slate-600 border border-slate-100">
+                      <div>ชื่อสเปกตู้: {eq.type}</div>
+                      <div>ไส้กรอง: {eq.filterType}</div>
+                      <div className="border-t mt-1.5 pt-1 flex justify-between text-[10px] font-bold text-slate-700">
+                        <span>ล้างกรองล่าสุด: {eq.lastChange}</span>
+                        <span>รอบถัดไป: {getNextDueDate(eq.lastChange)}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </main>
+          )}
+
+          <footer className="text-center text-[10px] text-slate-400 pt-6 mt-auto">
+            <p>© 2026 CP ALL PUBLIC COMPANY LIMITED • ENGINEERING SYSTEM</p>
+          </footer>
+
+          <datalist id="assigners">{assignerList.map((n, i) => <option key={i} value={n} />)}</datalist>
+          <datalist id="operators">{operatorList.map((n, i) => <option key={i} value={n} />)}</datalist>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
