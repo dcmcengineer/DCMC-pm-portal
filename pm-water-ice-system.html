@@ -13,12 +13,16 @@
 
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Anuphan:wght@300;400;500;600;700&display=swap');
-    body { font-family: 'Anuphan', sans-serif; }
+    body {
+      font-family: 'Anuphan', sans-serif;
+    }
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(6px); }
       to { opacity: 1; transform: translateY(0); }
     }
-    .animate-fadeIn { animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+    .animate-fadeIn {
+      animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-800 antialiased min-h-screen pb-12">
@@ -33,11 +37,12 @@
   </div>
 
   <script type="text/babel">
-    // ปรับรูปแบบการประกาศตัวแปรเพื่อความปลอดภัยของ Babel บน Web Server
+    // แก้วิธีการดึงค่าจาก React ป้องกันการชนกันของ Babel Node (แก้ปัญหาหลักของน้า)
     const useState = React.useState;
     const useEffect = React.useEffect;
     const useMemo = React.useMemo;
 
+    // 🔗 ลิงก์ Google Web App API 
     const GOOGLE_WEB_APP_URL = "https://script.google.com/macros/s/AKfycby6-Dyp_LItjpzQk5eyIFw7paCsGPfko9Aqjjj6cApgmDPtwcu7YGcuatiUm5ruz4SWXA/exec";
 
     const initialEquipments = [
@@ -65,17 +70,17 @@
       const locations = ["อาคาร DC", "อาคารโรงอาหารผู้รับเหมา"];
       const todayStr = new Date().toISOString().split('T')[0];
 
-      // แก้ไขปัญหาหน้าค้าง: เพิ่ม State คุมการโหลด
+      // เพิ่ม State ควบคุมหน้าโหลด ป้องกันหน้าขาวค้าง
       const [isLoading, setIsLoading] = useState(true);
       const [currentView, setCurrentView] = useState('form');
       const [equipmentTab, setEquipmentTab] = useState('WAT');
 
-      const [equipments, setEquipments] = useState(() => {
-        const saved = localStorage.getItem("cp_pm_equipments_fixed");
+      const [equipments, setEquipments] = useState(function() {
+        var saved = localStorage.getItem("cp_pm_equipments_fixed");
         return saved ? JSON.parse(saved) : initialEquipments;
       });
 
-      // ปรับปรุงการประกาศค่าตั้งต้นแบบคลีน ลดปัญหาพังที่โครงสร้าง Array วนลูป
+      // ปรับปรุงฟังก์ชันตั้งค่าเริ่มต้นแบบคลีนเพื่อความเสถียร
       const [checklistState, setChecklistState] = useState({});
 
       const [headerData, setHeaderData] = useState({
@@ -89,58 +94,67 @@
       const [submitStage, setSubmitStage] = useState('idle'); 
       const [alertMsg, setAlertMsg] = useState("");
 
-      // จัดเตรียมโครงสร้างฟอร์มเมื่อแอปเริ่มทำงาน
-      useEffect(() => {
-        const initialStates = {};
-        equipments.forEach(eq => {
+      // จัดเตรียมข้อมูลฟอร์มและสั่งปิดตัวดาวน์โหลดเมื่อพร้อมใช้งาน
+      useEffect(function() {
+        var initialStates = {};
+        initialEquipments.forEach(function(eq) {
           initialStates[eq.id] = {
             q1: "ปกติ", q2: "ปกติ", q3: eq.hasPump ? "ปกติ" : "-", q4: "ปกติ", q5: "ปกติ",
             q6_tds: "", q7_filter: "ยังไม่ถึงรอบ", q8: "ปกติ"
           };
         });
         setChecklistState(initialStates);
-        
-        // ปิดหน้าจอโหลดทันที ป้องกันแอปค้างหน้านี้ค้างขาว
-        setIsLoading(false);
-      }, [equipments]);
+        setIsLoading(false); // ปิดการดาวน์โหลดทันที
+      }, []);
 
-      useEffect(() => {
+      useEffect(function() {
         localStorage.setItem("cp_pm_equipments_fixed", JSON.stringify(equipments));
       }, [equipments]);
 
-      const getNextDueDate = (dateStr) => {
+      const getNextDueDate = function(dateStr) {
         if (!dateStr) return "";
-        const d = new Date(dateStr);
+        var d = new Date(dateStr);
         d.setMonth(d.getMonth() + 3);
         return d.toISOString().split('T')[0];
       };
 
-      const isOverdue = (dateStr) => {
-        const nextDate = getNextDueDate(dateStr);
+      const isOverdue = function(dateStr) {
+        var nextDate = getNextDueDate(dateStr);
         if (!nextDate) return false;
         return new Date(nextDate) <= new Date();
       };
 
-      const handleHeaderChange = (e) => {
-        const { name, value } = e.target;
-        setHeaderData(prev => ({ ...prev, [name]: value }));
+      const handleHeaderChange = function(e) {
+        var name = e.target.name;
+        var value = e.target.value;
+        setHeaderData(function(prev) {
+          var updated = Object.assign({}, prev);
+          updated[name] = value;
+          return updated;
+        });
       };
 
-      const handleChecklistChange = (id, field, value) => {
-        setChecklistState(prev => ({
-          ...prev,
-          [id]: { ...prev[id], [field]: value }
-        }));
+      const handleChecklistChange = function(id, field, value) {
+        setChecklistState(function(prev) {
+          var updated = Object.assign({}, prev);
+          updated[id] = Object.assign({}, updated[id]);
+          updated[id][field] = value;
+          return updated;
+        });
 
         if (field === 'q7_filter' && value === 'เปลี่ยน') {
-          setEquipments(prev => prev.map(eq => {
-            if (eq.id === id) return { ...eq, lastChange: todayStr };
-            return eq;
-          }));
+          setEquipments(function(prev) {
+            return prev.map(function(eq) {
+              if (eq.id === id) {
+                return Object.assign({}, eq, { lastChange: todayStr });
+              }
+              return eq;
+            });
+          });
         }
       };
 
-      const handleFormSubmit = async (e) => {
+      const handleFormSubmit = async function(e) {
         e.preventDefault();
         setAlertMsg("");
         setSubmitStage('idle');
@@ -155,7 +169,7 @@
         setSubmitStage('sending');
 
         try {
-          const payload = {
+          var payload = {
             metadata: headerData,
             checklist: checklistState,
             equipmentSnapshot: equipments
@@ -179,12 +193,14 @@
         }
       };
 
-      const filteredEquipments = useMemo(() => {
-        return equipments.filter(eq => eq.category === equipmentTab && (
-          eq.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          eq.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          eq.filterType.toLowerCase().includes(searchQuery.toLowerCase())
-        ));
+      const filteredEquipments = useMemo(function() {
+        return equipments.filter(function(eq) {
+          return eq.category === equipmentTab && (
+            eq.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            eq.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            eq.filterType.toLowerCase().includes(searchQuery.toLowerCase())
+          );
+        });
       }, [equipments, equipmentTab, searchQuery]);
 
       if (isLoading) {
@@ -206,7 +222,7 @@
             <div className="p-4">
               <div className="flex items-center justify-between text-[10px]">
                 <span className="bg-emerald-600 text-white font-black px-2 py-0.5 rounded tracking-wide">CP ALL</span>
-                <span className="text-slate-400 font-bold flex items-center">⚙️ SYSTEM ENG</span>
+                <span className="text-slate-400 font-bold flex items-center">📋 ENGINE SYSTEM</span>
               </div>
               <h1 className="text-[15px] font-extrabold text-slate-900 mt-1.5 tracking-tight">บริษัท ซีพีออลล์ จำกัด (มหาชน)</h1>
               <h2 className="text-[12px] font-bold text-slate-600 flex items-center mt-0.5">
@@ -216,10 +232,10 @@
             </div>
 
             <div className="flex border-t border-slate-100 bg-slate-50/80 p-1">
-              <button type="button" onClick={() => setCurrentView('form')} className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${currentView === 'form' ? 'bg-white text-emerald-700 shadow-xs border' : 'text-slate-500'}`}>
+              <button type="button" onClick={function() { setCurrentView('form'); }} className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${currentView === 'form' ? 'bg-white text-emerald-700 shadow-xs border' : 'text-slate-500'}`}>
                 📝 บันทึกใบงาน PM
               </button>
-              <button type="button" onClick={() => setCurrentView('history')} className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${currentView === 'history' ? 'bg-white text-emerald-700 shadow-xs border' : 'text-slate-500'}`}>
+              <button type="button" onClick={function() { setCurrentView('history'); }} className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${currentView === 'history' ? 'bg-white text-emerald-700 shadow-xs border' : 'text-slate-500'}`}>
                 🔍 ดูข้อมูล/ประวัติเครื่องจักร
               </button>
             </div>
@@ -288,9 +304,9 @@
                     <div>
                       <label className="text-slate-400 font-bold block mb-1">รายชื่อผู้ปฏิบัติงาน วันที่ 1</label>
                       <div className="grid grid-cols-2 gap-1.5 mt-1">
-                        {[1, 2, 3, 4].map(n => (
-                          <input key={n} list="operators" name={`op1_${n}`} value={headerData[`op1_${n}`]} onChange={handleHeaderChange} placeholder={`ช่างคนที่ ${n}`} className="p-2 border border-slate-200 rounded-xl text-xs bg-slate-50/50 font-medium" />
-                        ))}
+                        {[1, 2, 3, 4].map(function(n) {
+                          return <input key={n} list="operators" name={`op1_${n}`} value={headerData[`op1_${n}`]} onChange={handleHeaderChange} placeholder={`ช่างคนที่ ${n}`} className="p-2 border border-slate-200 rounded-xl text-xs bg-slate-50/50 font-medium" />;
+                        })}
                       </div>
                     </div>
                   </div>
@@ -298,17 +314,17 @@
 
                 <div className="space-y-2">
                   <div className="flex bg-slate-200 p-1 rounded-2xl font-bold text-center text-xs">
-                    <button type="button" onClick={() => setEquipmentTab('WAT')} className={`flex-1 py-2 rounded-xl transition-all ${equipmentTab === 'WAT' ? 'bg-white text-emerald-800 shadow-xs' : 'text-slate-500'}`}>🚰 ตู้ทำน้ำเย็น ({equipments.filter(e => e.category === 'WAT').length})</button>
-                    <button type="button" onClick={() => setEquipmentTab('ICE')} className={`flex-1 py-2 rounded-xl transition-all ${equipmentTab === 'ICE' ? 'bg-white text-emerald-800 shadow-xs' : 'text-slate-500'}`}>🧊 เครื่องทำน้ำแข็ง ({equipments.filter(e => e.category === 'ICE').length})</button>
+                    <button type="button" onClick={function() { setEquipmentTab('WAT'); }} className={`flex-1 py-2 rounded-xl transition-all ${equipmentTab === 'WAT' ? 'bg-white text-emerald-800 shadow-xs' : 'text-slate-500'}`}>🚰 ตู้ทำน้ำเย็น ({equipments.filter(e => e.category === 'WAT').length})</button>
+                    <button type="button" onClick={function() { setEquipmentTab('ICE'); }} className={`flex-1 py-2 rounded-xl transition-all ${equipmentTab === 'ICE' ? 'bg-white text-emerald-800 shadow-xs' : 'text-slate-500'}`}>🧊 เครื่องทำน้ำแข็ง ({equipments.filter(e => e.category === 'ICE').length})</button>
                   </div>
-                  <input type="text" placeholder="🔍 ค้นหารหัสตู้ หรือสถานที่ตั้ง..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-medium outline-none" />
+                  <input type="text" placeholder="🔍 ค้นหารหัสตู้ หรือสถานที่ตั้ง..." value={searchQuery} onChange={function(e) { setSearchQuery(e.target.value); }} className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-medium outline-none" />
                 </div>
 
                 <section className="space-y-3">
-                  {filteredEquipments.map((eq) => {
-                    const currentItemCheck = checklistState[eq.id] || { q1: "ปกติ", q2: "ปกติ", q3: "ปกติ", q4: "ปกติ", q5: "ปกติ", q6_tds: "", q7_filter: "ยังไม่ถึงรอบ", q8: "ปกติ" };
-                    const nextDate = getNextDueDate(eq.lastChange);
-                    const dueAlert = isOverdue(eq.lastChange);
+                  {filteredEquipments.map(function(eq) {
+                    var currentItemCheck = checklistState[eq.id] || { q1: "ปกติ", q2: "ปกติ", q3: "ปกติ", q4: "ปกติ", q5: "ปกติ", q6_tds: "", q7_filter: "ยังไม่ถึงรอบ", q8: "ปกติ" };
+                    var nextDate = getNextDueDate(eq.lastChange);
+                    var dueAlert = isOverdue(eq.lastChange);
 
                     return (
                       <div key={eq.id} className="bg-white rounded-2xl p-4 border border-slate-200/60 shadow-xs space-y-3 animate-fadeIn">
@@ -328,9 +344,9 @@
                           <div className="flex flex-col space-y-1 bg-slate-50 p-2 rounded-xl border border-slate-100">
                             <span className="font-medium text-emerald-800">1. สภาพโครงสร้างตู้และจุดยึดต่างๆ</span>
                             <div className="flex space-x-2 mt-0.5">
-                              {["ปกติ", "ไม่ปกติ"].map(v => (
-                                <button key={v} type="button" onClick={() => handleChecklistChange(eq.id, 'q1', v)} className={`flex-1 py-1 rounded-lg font-bold text-[10px] border ${currentItemCheck.q1 === v ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-500'}`}>{v === 'ปกติ' ? '🟢 ปกติ' : '🔴 ชำรุด'}</button>
-                              ))}
+                              {["ปกติ", "ไม่ปกติ"].map(function(v) {
+                                return <button key={v} type="button" onClick={function() { handleChecklistChange(eq.id, 'q1', v); }} className={`flex-1 py-1 rounded-lg font-bold text-[10px] border ${currentItemCheck.q1 === v ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-500'}`}>{v === 'ปกติ' ? '🟢 ปกติ' : '🔴 ชำรุด'}</button>;
+                              })}
                             </div>
                           </div>
 
@@ -338,9 +354,9 @@
                           <div className="flex flex-col space-y-1 bg-slate-50 p-2 rounded-xl border border-slate-100">
                             <span className="font-medium text-emerald-800">2. การรั่วซึมของข้อต่อ สายน้ำ และกระบอกกรอง</span>
                             <div className="flex space-x-2 mt-0.5">
-                              {["ปกติ", "ไม่ปกติ"].map(v => (
-                                <button key={v} type="button" onClick={() => handleChecklistChange(eq.id, 'q2', v)} className={`flex-1 py-1 rounded-lg font-bold text-[10px] border ${currentItemCheck.q2 === v ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-500'}`}>{v === 'ปกติ' ? '🟢 ไม่รั่วซึม' : '🔴 รั่วซึม'}</button>
-                              ))}
+                              {["ปกติ", "ไม่ปกติ"].map(function(v) {
+                                return <button key={v} type="button" onClick={function() { handleChecklistChange(eq.id, 'q2', v); }} className={`flex-1 py-1 rounded-lg font-bold text-[10px] border ${currentItemCheck.q2 === v ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-500'}`}>{v === 'ปกติ' ? '🟢 ไม่รั่วซึม' : '🔴 รั่วซึม'}</button>;
+                              })}
                             </div>
                           </div>
 
@@ -349,9 +365,9 @@
                             <div className="flex flex-col space-y-1 bg-slate-50 p-2 rounded-xl border border-slate-100">
                               <span className="font-medium text-emerald-800">3. ระบบปั๊มน้ำกรอง (เดินเงียบ/แรงดันปกติ)</span>
                               <div className="flex space-x-2 mt-0.5">
-                                {["ปกติ", "ไม่ปกติ"].map(v => (
-                                  <button key={v} type="button" onClick={() => handleChecklistChange(eq.id, 'q3', v)} className={`flex-1 py-1 rounded-lg font-bold text-[10px] border ${currentItemCheck.q3 === v ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-500'}`}>{v === 'ปกติ' ? '🟢 เดินเงียบ' : '🔴 ผิดปกติ'}</button>
-                                ))}
+                                {["ปกติ", "ไม่ปกติ"].map(function(v) {
+                                  return <button key={v} type="button" onClick={function() { handleChecklistChange(eq.id, 'q3', v); }} className={`flex-1 py-1 rounded-lg font-bold text-[10px] border ${currentItemCheck.q3 === v ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-500'}`}>{v === 'ปกติ' ? '🟢 เดินเงียบ' : '🔴 ผิดปกติ'}</button>;
+                                })}
                               </div>
                             </div>
                           )}
@@ -360,9 +376,9 @@
                           <div className="flex flex-col space-y-1 bg-slate-50 p-2 rounded-xl border border-slate-100">
                             <span className="font-medium text-emerald-800">4. ตรวจสอบระบบไฟฟ้ารั่ว (ปุ่มทดสอบ ELCB)</span>
                             <div className="flex space-x-2 mt-0.5">
-                              {["ปกติ", "ไม่ปกติ"].map(v => (
-                                <button key={v} type="button" onClick={() => handleChecklistChange(eq.id, 'q4', v)} className={`flex-1 py-1 rounded-lg font-bold text-[10px] border ${currentItemCheck.q4 === v ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-500'}`}>{v === 'ปกติ' ? '🟢 ปลอดภัย' : '🔴 ไฟรั่ว'}</button>
-                              ))}
+                              {["ปกติ", "ไม่ปกติ"].map(function(v) {
+                                return <button key={v} type="button" onClick={function() { handleChecklistChange(eq.id, 'q4', v); }} className={`flex-1 py-1 rounded-lg font-bold text-[10px] border ${currentItemCheck.q4 === v ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-500'}`}>{v === 'ปกติ' ? '🟢 ปลอดภัย' : '🔴 ไฟรั่ว'}</button>;
+                              })}
                             </div>
                           </div>
 
@@ -370,25 +386,25 @@
                           <div className="flex flex-col space-y-1 bg-slate-50 p-2 rounded-xl border border-slate-100">
                             <span className="font-medium text-emerald-800">5. ระบบคอมเพรสเซอร์ทำความเย็น/ร้อน</span>
                             <div className="flex space-x-2 mt-0.5">
-                              {["ปกติ", "ไม่ปกติ"].map(v => (
-                                <button key={v} type="button" onClick={() => handleChecklistChange(eq.id, 'q5', v)} className={`flex-1 py-1 rounded-lg font-bold text-[10px] border ${currentItemCheck.q5 === v ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-500'}`}>{v === 'ปกติ' ? '🟢 ทำงานปกติ' : '🔴 ไม่เย็น'}</button>
-                              ))}
+                              {["ปกติ", "ไม่ปกติ"].map(function(v) {
+                                return <button key={v} type="button" onClick={function() { handleChecklistChange(eq.id, 'q5', v); }} className={`flex-1 py-1 rounded-lg font-bold text-[10px] border ${currentItemCheck.q5 === v ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-500'}`}>{v === 'ปกติ' ? '🟢 ทำงานปกติ' : '🔴 ไม่เย็น'}</button>;
+                              })}
                             </div>
                           </div>
 
                           {/* ข้อ 6 */}
                           <div className="bg-slate-50 p-2 rounded-xl border border-slate-100 space-y-1">
                             <span className="font-medium text-slate-700">6. ตรวจวัดคุณภาพน้ำ (ค่า TDS - ppm)</span>
-                            <input type="number" placeholder="พิมพ์ค่าตัวเลข TDS" value={currentItemCheck.q6_tds || ""} onChange={(e) => handleChecklistChange(eq.id, 'q6_tds', e.target.value)} className="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs font-bold" />
+                            <input type="number" placeholder="พิมพ์ค่าตัวเลข TDS" value={currentItemCheck.q6_tds || ""} onChange={function(e) { handleChecklistChange(eq.id, 'q6_tds', e.target.value); }} className="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs font-bold" />
                           </div>
 
                           {/* ข้อ 7 */}
                           <div className="bg-slate-50 p-2 rounded-xl border border-slate-100 space-y-1">
                             <span className="font-medium text-slate-700">7. ผลการเปลี่ยนไส้กรองรอบนี้</span>
                             <div className="flex space-x-2 mt-0.5">
-                              {["เปลี่ยน", "ยังไม่ถึงรอบ"].map(v => (
-                                <button key={v} type="button" onClick={() => handleChecklistChange(eq.id, 'q7_filter', v)} className={`flex-1 py-1 rounded-lg font-bold text-[10px] border ${currentItemCheck.q7_filter === v ? 'bg-amber-600 text-white border-amber-600' : 'bg-white text-slate-500'}`}>{v === 'เปลี่ยน' ? '🧼 เปลี่ยนแล้ว' : '⏳ ยังไม่ถึงรอบ'}</button>
-                              ))}
+                              {["เปลี่ยน", "ยังไม่ถึงรอบ"].map(function(v) {
+                                return <button key={v} type="button" onClick={function() { handleChecklistChange(eq.id, 'q7_filter', v); }} className={`flex-1 py-1 rounded-lg font-bold text-[10px] border ${currentItemCheck.q7_filter === v ? 'bg-amber-600 text-white border-amber-600' : 'bg-white text-slate-500'}`}>{v === 'เปลี่ยน' ? '🧼 เปลี่ยนแล้ว' : '⏳ ยังไม่ถึงรอบ'}</button>;
+                              })}
                             </div>
                           </div>
 
@@ -396,9 +412,9 @@
                           <div className="flex flex-col space-y-1 bg-slate-50 p-2 rounded-xl border border-slate-100">
                             <span className="font-medium text-emerald-800">8. การล้างทำความสะอาดตู้/ถังพักน้ำหัวก๊อก</span>
                             <div className="flex space-x-2 mt-0.5">
-                              {["ปกติ", "ไม่ปกติ"].map(v => (
-                                <button key={v} type="button" onClick={() => handleChecklistChange(eq.id, 'q8', v)} className={`flex-1 py-1 rounded-lg font-bold text-[10px] border ${currentItemCheck.q8 === v ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-500'}`}>{v === 'ปกติ' ? '🟢 ล้างเรียบร้อย' : '🔴 ยังไม่ได้ล้าง'}</button>
-                              ))}
+                              {["ปกติ", "ไม่ปกติ"].map(function(v) {
+                                return <button key={v} type="button" onClick={function() { handleChecklistChange(eq.id, 'q8', v); }} className={`flex-1 py-1 rounded-lg font-bold text-[10px] border ${currentItemCheck.q8 === v ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-500'}`}>{v === 'ปกติ' ? '🟢 ล้างเรียบร้อย' : '🔴 ยังไม่ได้ล้าง'}</button>;
+                              })}
                             </div>
                           </div>
 
@@ -415,8 +431,8 @@
                 <section className="bg-white p-4 rounded-3xl shadow-xs border border-slate-200/50 space-y-3 text-xs">
                   <div className="font-bold text-slate-500 uppercase tracking-wider">📌 สรุปผลการ PM ภาพรวมของระบบ</div>
                   <div className="grid grid-cols-2 gap-2">
-                    <button type="button" onClick={() => setHeaderData(p => ({ ...p, overallStatus: "ปกติ" }))} className={`p-2.5 rounded-xl border font-bold text-center transition-all ${headerData.overallStatus === 'ปกติ' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-500'}`}>🟢 ปกติพร้อมใช้</button>
-                    <button type="button" onClick={() => setHeaderData(p => ({ ...p, overallStatus: "ไม่ปกติ" }))} className={`p-2.5 rounded-xl border font-bold text-center transition-all ${headerData.overallStatus === 'ไม่ปกติ' ? 'bg-rose-600 text-white border-rose-600' : 'bg-white text-slate-500'}`}>🔴 ต้องปรับปรุง</button>
+                    <button type="button" onClick={function() { setHeaderData(function(p) { return Object.assign({}, p, { overallStatus: "ปกติ" }); }); }} className={`p-2.5 rounded-xl border font-bold text-center transition-all ${headerData.overallStatus === 'ปกติ' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-500'}`}>🟢 ปกติพร้อมใช้</button>
+                    <button type="button" onClick={function() { setHeaderData(function(p) { return Object.assign({}, p, { overallStatus: "ไม่ปกติ" }); }); }} className={`p-2.5 rounded-xl border font-bold text-center transition-all ${headerData.overallStatus === 'ไม่ปกติ' ? 'bg-rose-600 text-white border-rose-600' : 'bg-white text-slate-500'}`}>🔴 ต้องปรับปรุง</button>
                   </div>
                   <div>
                     <textarea name="summaryText" value={headerData.summaryText} onChange={handleHeaderChange} rows="3" placeholder="พิมพ์รายงานเพิ่มเติมยื่นต่อหัวหน้า..." className="w-full p-2.5 border border-slate-200 bg-slate-50/50 rounded-xl outline-none text-xs" />
@@ -437,16 +453,16 @@
             <main className="p-4 space-y-4 flex-1 animate-fadeIn">
               <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-xs space-y-3">
                 <h3 className="text-sm font-extrabold text-slate-800">📊 ทะเบียนประวัติและสถานะเครื่องจักร</h3>
-                <input type="text" placeholder="🔍 ค้นหาในประวัติเครื่องจักร..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none" />
+                <input type="text" placeholder="🔍 ค้นหาในประวัติเครื่องจักร..." value={searchQuery} onChange={function(e) { setSearchQuery(e.target.value); }} className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none" />
               </div>
 
               <div className="space-y-2">
-                {equipments.filter(e => 
-                  e.id.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                  e.location.toLowerCase().includes(searchQuery.toLowerCase())
-                ).map((eq) => {
-                  const nDate = getNextDueDate(eq.lastChange);
-                  const isOver = isOverdue(eq.lastChange);
+                {equipments.filter(function(eq) { 
+                  return eq.id.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                         eq.location.toLowerCase().includes(searchQuery.toLowerCase());
+                }).map(function(eq) {
+                  var nDate = getNextDueDate(eq.lastChange);
+                  var isOver = isOverdue(eq.lastChange);
 
                   return (
                     <div key={eq.id} className="bg-white border border-slate-100 rounded-2xl p-3 shadow-xs flex flex-col space-y-2">
