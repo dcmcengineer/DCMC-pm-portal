@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>KYT MODULAR ENG</title>
+<title>KYT MODULAR ENG1-2</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <style>
@@ -15,6 +15,7 @@
     --green: #2F7A52;
     --line: #D8D2C2;
     --input-focus: #1A73E8;
+    --shadow-color: rgba(0, 0, 0, 0.35);
   }
   
   * {
@@ -40,7 +41,7 @@
     background: var(--paper);
     margin: 0 10px;
     border-radius: 12px; /* โค้งมนเข้ากับดีไซน์มือถือสมัยใหม่ */
-    box-shadow: 0 10px 30px rgba(0,0,0,.35);
+    box-shadow: 0 10px 30px var(--shadow-color);
     position: relative;
     overflow: hidden;
   }
@@ -145,18 +146,17 @@
     line-height: 1.3;
   }
   
-  /* ปรับปรุงขนาดและ UI ของ Input ให้แตะง่ายบนมือถือ */
   input, textarea {
     width: 100%;
     font-family: 'Inter', sans-serif;
-    font-size: 16px; /* ป้องกันหน้าจอซูมอัตโนมัติใน iOS ด้วยการใช้ขนาด 16px */
+    font-size: 16px; /* ป้องกันหน้าจอซูมอัตโนมัติใน iOS */
     padding: 12px;
     border: 1.5px solid var(--line);
     border-radius: 8px;
     background: #fff;
     color: var(--ink);
     margin-top: 4px;
-    -webkit-appearance: none; /* ล้างรูปแบบดั้งเดิมของ Safari */
+    -webkit-appearance: none;
   }
   
   input:focus, textarea:focus {
@@ -174,7 +174,6 @@
     min-height: 80px;
   }
   
-  /* แผงปุ่มบวกลบสำหรับจำนวนคน */
   .participants-row {
     display: flex;
     align-items: center;
@@ -224,7 +223,6 @@
     font-weight: 600;
   }
   
-  /* ซ่อนปุ่มหมุนตัวเลขแบบพื้นฐาน */
   input[type=number]::-webkit-inner-spin-button, 
   input[type=number]::-webkit-outer-spin-button { 
     -webkit-appearance: none; 
@@ -244,7 +242,6 @@
     padding: 4px 16px 20px;
   }
   
-  /* ขยายขนาดปุ่มส่งข้อมูลให้โดดเด่น */
   button.submit {
     width: 100%;
     background: var(--green);
@@ -312,7 +309,132 @@
     font-size: 10px;
   }
 
-  /* ปรับแต่งส่วนติดต่อบนหน้าจอขนาดเล็กพิเศษ (เช่น iPhone SE หรือมือถือขนาดเล็ก) */
+  .modal-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+    padding: 16px;
+  }
+  
+  .modal-overlay.active {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  
+  .modal-card {
+    background: var(--paper);
+    border-radius: 12px;
+    width: 100%;
+    max-width: 400px;
+    box-shadow: 0 15px 35px rgba(0,0,0,0.4);
+    border: 3px solid var(--ink);
+    overflow: hidden;
+    transform: scale(0.9);
+    transition: transform 0.2s ease;
+  }
+  
+  .modal-overlay.active .modal-card {
+    transform: scale(1);
+  }
+  
+  .modal-header {
+    background: var(--ink);
+    color: var(--paper);
+    padding: 14px;
+    text-align: center;
+    font-family: 'Oswald', sans-serif;
+    font-size: 18px;
+    text-transform: uppercase;
+    letter-spacing: .02em;
+  }
+  
+  .modal-body {
+    padding: 20px;
+    font-size: 15px;
+    line-height: 1.6;
+  }
+  
+  .modal-info-item {
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px dashed var(--line);
+  }
+  
+  .modal-info-item:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+  }
+  
+  .modal-info-label {
+    font-size: 11px;
+    color: #7A7568;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+  
+  .modal-info-val {
+    font-weight: 600;
+    font-size: 15px;
+    color: var(--ink);
+    margin-top: 2px;
+    word-break: break-word;
+  }
+  
+  .modal-footer {
+    display: flex;
+    gap: 12px;
+    padding: 0 20px 20px;
+  }
+  
+  .modal-btn {
+    flex: 1;
+    padding: 14px;
+    border-radius: 8px;
+    font-family: 'Oswald', sans-serif;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: center;
+    border: none;
+    text-transform: uppercase;
+    letter-spacing: .02em;
+    transition: background-color 0.15s;
+  }
+  
+  .modal-btn.cancel {
+    background: #D8D2C2;
+    color: var(--ink);
+  }
+  
+  .modal-btn.cancel:active {
+    background: #C9C4B4;
+  }
+  
+  .modal-btn.confirm {
+    background: var(--orange);
+    color: #fff;
+  }
+  
+  .modal-btn.confirm:active {
+    background: #c74515;
+  }
+  
+  .modal-btn.success-ok {
+    background: var(--green);
+    color: #fff;
+  }
+  
+  .modal-btn.success-ok:active {
+    background: #235e3e;
+  }
+
   @media (max-width: 360px) {
     h1 {
       font-size: 21px;
@@ -408,6 +530,46 @@
     </div>
   </div>
 
+  <!-- 1. กล่องข้อความยืนยันการบันทึกข้อมูล (Confirmation Popup) -->
+  <div class="modal-overlay" id="confirmModal">
+    <div class="modal-card">
+      <div class="modal-header">🤔 ยืนยันการบันทึกกิจกรรม</div>
+      <div class="modal-body">
+        <div class="modal-info-item">
+          <div class="modal-info-label">📅 ยืนยัน KYT สำหรับวันที่</div>
+          <div class="modal-info-val" id="confDate">-</div>
+        </div>
+        <div class="modal-info-item">
+          <div class="modal-info-label">📣 คำชี้นิ้วเรียกขาน (KYT)</div>
+          <div class="modal-info-val" id="confPhrase">-</div>
+        </div>
+        <div class="modal-info-item">
+          <div class="modal-info-label">👥 จำนวนผู้ร่วมกิจกรรม</div>
+          <div class="modal-info-val"><span id="confParts">1</span> คน</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="modal-btn cancel" id="btnCancel">ไม่ใช่</button>
+        <button type="button" class="modal-btn confirm" id="btnConfirm">ใช่</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. กล่องข้อความแจ้งบันทึกเสร็จสมบูรณ์ (Success Popup) -->
+  <div class="modal-overlay" id="successModal">
+    <div class="modal-card">
+      <div class="modal-header">🎉 บันทึกสำเร็จ</div>
+      <div class="modal-body" style="text-align: center; padding: 30px 20px;">
+        <div style="font-size: 48px; margin-bottom: 12px;">✔️</div>
+        <div style="font-size: 18px; font-weight: 600; color: var(--green);">บันทึกข้อมูลเรียบร้อยแล้ว</div>
+        <div style="font-size: 13px; color: #7A7568; margin-top: 6px;">ระบบเก็บรายละเอียดการทำกิจกรรม KYT เข้าตารางชีตเรียบร้อยแล้วครับ</div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="modal-btn success-ok" id="btnSuccessOk">ตกลง</button>
+      </div>
+    </div>
+  </div>
+
 <script>
   // คัดลอก URL ของ Web App หลังจากทำการ Deploy บน Google Sheets มาใส่ในช่องด้านล่างนี้
   const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxOOffCrnxk7hEQ_JwQzHkX_UQm7kacgHjJ70mOsBQ9tc26lSFSn2-T2fQdRvzcZ4or0w/exec";
@@ -426,23 +588,43 @@
     participants.value = Math.max(1, parseInt(participants.value || 1) - 1);
   });
 
+  // ตัวแปรเก็บข้อมูลชั่วคราวขณะรอการกดยืนยัน
+  let pendingPayload = null;
+
+  // อ้างอิง Element ฟอร์มและป็อปอัพ
   const form = document.getElementById('kytForm');
   const statusBox = document.getElementById('status');
   const submitBtn = document.getElementById('submitBtn');
+  
+  const confirmModal = document.getElementById('confirmModal');
+  const successModal = document.getElementById('successModal');
+  
+  const confDate = document.getElementById('confDate');
+  const confPhrase = document.getElementById('confPhrase');
+  const confParts = document.getElementById('confParts');
+  
+  const btnCancel = document.getElementById('btnCancel');
+  const btnConfirm = document.getElementById('btnConfirm');
+  const btnSuccessOk = document.getElementById('btnSuccessOk');
 
-  // จัดการการส่งฟอร์มข้อมูลแบบ POST
-  form.addEventListener('submit', async (e) => {
+  // ฟังก์ชันช่วยแปลงรูปแบบวันที่ให้อ่านง่าย (YYYY-MM-DD เป็น DD/MM/YYYY)
+  function formatDate(dateString) {
+    if (!dateString) return "-";
+    const parts = dateString.split("-");
+    if (parts.length === 3) {
+      return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+    return dateString;
+  }
+
+  // เมื่อผู้ใช้งานคลิกปุ่มบันทึกข้อมูลหลัก
+  form.addEventListener('submit', (e) => {
     e.preventDefault();
     statusBox.className = 'status';
     statusBox.style.display = 'none';
 
-    if (WEB_APP_URL.includes('PASTE_YOUR')) {
-      statusBox.className = 'status err';
-      statusBox.textContent = '❌ ข้อมูลไม่สามารถบันทึกได้เนื่องจากยังไม่ได้ตั้งค่าคีย์เชื่อมโยง WEB_APP_URL ในส่วนสคริปต์';
-      return;
-    }
-
-    const payload = {
+    // เตรียม Payload ข้อมูล
+    pendingPayload = {
       date: dateInput.value,
       process: document.getElementById('process').value,
       hazard: document.getElementById('hazard').value,
@@ -450,6 +632,33 @@
       kytPhrase: document.getElementById('kytPhrase').value,
       participants: participants.value
     };
+
+    // ใส่ข้อมูลรายละเอียดลงไปในหน้าต่างแจ้งยืนยัน
+    confDate.textContent = formatDate(pendingPayload.date);
+    confPhrase.textContent = pendingPayload.kytPhrase;
+    confParts.textContent = pendingPayload.participants;
+
+    // เปิดการแสดงผลหน้าต่างยืนยัน (Confirmation Popup)
+    confirmModal.classList.add('active');
+  });
+
+  // หากผู้ใช้เลือกกดปุ่ม "ไม่ใช่" (ยกเลิก)
+  btnCancel.addEventListener('click', () => {
+    confirmModal.classList.remove('active');
+    pendingPayload = null;
+  });
+
+  // หากผู้ใช้เลือกกดปุ่ม "ใช่" (ตกลงส่งข้อมูล)
+  btnConfirm.addEventListener('click', async () => {
+    confirmModal.classList.remove('active');
+    if (!pendingPayload) return;
+
+    if (WEB_APP_URL.includes('PASTE_YOUR')) {
+      statusBox.className = 'status err';
+      statusBox.textContent = '❌ ข้อมูลไม่สามารถบันทึกได้เนื่องจากยังไม่ได้ตั้งค่าคีย์เชื่อมโยง WEB_APP_URL ในส่วนสคริปต์';
+      pendingPayload = null;
+      return;
+    }
 
     submitBtn.disabled = true;
     submitBtn.textContent = 'กำลังส่งข้อมูล...';
@@ -459,10 +668,13 @@
         method: 'POST',
         mode: 'no-cors',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(pendingPayload)
       });
-      statusBox.className = 'status ok';
-      statusBox.textContent = '✔️ บันทึกกิจกรรม KYT ลงในระบบ Google Sheets สำเร็จเรียบร้อยแล้ว!';
+      
+      // แสดงหน้าต่างป็อปอัพสำเร็จ (Success Modal)
+      successModal.classList.add('active');
+      
+      // เคลียร์ค่าในฟอร์มเตรียมสำหรับการลงข้อมูลชุดถัดไป
       form.reset();
       dateInput.value = new Date().toISOString().split('T')[0];
       participants.value = 1;
@@ -472,7 +684,13 @@
     } finally {
       submitBtn.disabled = false;
       submitBtn.textContent = 'บันทึกข้อมูล';
+      pendingPayload = null;
     }
+  });
+
+  // ปิดป็อปอัพแจ้งบันทึกเสร็จสมบูรณ์เมื่อกดปุ่ม "ตกลง"
+  btnSuccessOk.addEventListener('click', () => {
+    successModal.classList.remove('active');
   });
 </script>
 </body>
