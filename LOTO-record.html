@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>LOTO Safety Hub - ระบบเบิกคืนอุปกรณ์ตัดแยกพลังงาน</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts - Kanit & Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        hazard: {
+                            yellow: '#FACC15',
+                            darkyellow: '#EAB308',
+                            black: '#18181B',
+                            card: '#27272A'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Kanit', 'Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        body {
+            background-color: #09090b;
+            color: #f4f4f5;
+            font-family: 'Kanit', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        /* Stripes Bar Pattern */
+        .hazard-stripe {
+            background: repeating-linear-gradient(
+                -45deg,
+                #facc15,
+                #facc15 16px,
+                #18181b 16px,
+                #18181b 32px
+            );
+        }
+
+        .hazard-stripe-sm {
+            background: repeating-linear-gradient(
+                -45deg,
+                #facc15,
+                #facc15 8px,
+                #18181b 8px,
+                #18181b 16px
+            );
+        }
+
+        .hazard-border {
+            border-image: repeating-linear-gradient(
+                45deg,
+                #facc15,
+                #facc15 10px,
+                #18181b 10px,
+                #18181b 20px
+            ) 10;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #18181b;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #facc15;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex justify-center items-start sm:py-4">
+
+    <!-- Main Mobile Layout Container -->
+    <div class="w-full max-w-md bg-zinc-900 min-h-screen sm:min-h-[840px] sm:rounded-3xl shadow-2xl flex flex-col justify-between border-x border-zinc-800 relative overflow-hidden pb-20">
+
+        <!-- Top Header Banner -->
+        <div>
+            <!-- Danger Stripe Top Bar -->
+            <div class="hazard-stripe h-4 w-full"></div>
+            
+            <header class="bg-zinc-950 px-5 py-4 border-b border-zinc-800 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-amber-400 flex items-center justify-center text-zinc-950 font-black text-xl shadow-lg shadow-amber-400/20">
+                        <i class="fa-solid fa-lock text-xl"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-lg font-bold leading-tight text-white flex items-center gap-2">
+                            LOTO MASTER
+                            <span class="text-[10px] bg-amber-400/10 text-amber-400 border border-amber-400/30 px-2 py-0.5 rounded-full font-mono">SAFETY</span>
+                        </h1>
+                        <p class="text-xs text-zinc-400">ระบบเบิก-คืนอุปกรณ์ตัดแยกพลังงาน</p>
+                    </div>
+                </div>
+                <button onclick="switchTab('settings')" class="w-9 h-9 rounded-lg bg-zinc-800 border border-zinc-700 flex items-center justify-center text-zinc-400 hover:text-amber-400 transition">
+                    <i class="fa-solid fa-gear"></i>
+                </button>
+            </header>
+        </div>
+
+        <!-- Dynamic Main Content Area -->
+        <main class="flex-1 p-4 overflow-y-auto" id="mainContent">
+            
+            <!-- SECTION 1: CHECKOUT FORM (เบิกอุปกรณ์) -->
+            <section id="tab-checkout" class="space-y-4">
+                <div class="bg-amber-400/10 border-l-4 border-amber-400 p-3 rounded-r-lg flex items-center justify-between">
+                    <div>
+                        <h2 class="text-sm font-bold text-amber-400 flex items-center gap-1.5">
+                            <i class="fa-solid fa-arrow-right-from-bracket"></i> ฟอร์มเบิกอุปกรณ์ LOTO
+                        </h2>
+                        <p class="text-xs text-zinc-400">กรอกข้อมูลจุดตัดแยกและเลือกอุปกรณ์</p>
+                    </div>
+                    <span class="text-xs font-mono bg-zinc-800 px-2 py-1 rounded text-zinc-300" id="liveTimeDisplay">00:00</span>
+                </div>
+
+                <form id="checkoutForm" onsubmit="handleFormReview(event)" class="space-y-4">
+                    <!-- Date & Time Input -->
+                    <div class="bg-zinc-800/60 p-3.5 rounded-xl border border-zinc-700/50 space-y-1">
+                        <label class="text-xs text-zinc-400 font-medium block flex items-center gap-1.5">
+                            <i class="fa-regular fa-calendar-check text-amber-400"></i> วันที่และเวลาเบิก
+                        </label>
+                        <input type="datetime-local" id="checkoutDateTime" required
+                            class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400">
+                    </div>
+
+                    <!-- Borrower Name -->
+                    <div class="bg-zinc-800/60 p-3.5 rounded-xl border border-zinc-700/50 space-y-1">
+                        <label class="text-xs text-zinc-400 font-medium block flex items-center gap-1.5">
+                            <i class="fa-solid fa-user-shield text-amber-400"></i> ชื่อ-นามสกุล ผู้เบิก
+                        </label>
+                        <input type="text" id="borrowerName" placeholder="เช่น นายสมชาย ปลอดภัย" required
+                            class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400">
+                    </div>
+
+                    <!-- Energy Isolation Point -->
+                    <div class="bg-zinc-800/60 p-3.5 rounded-xl border border-zinc-700/50 space-y-1">
+                        <label class="text-xs text-zinc-400 font-medium block flex items-center gap-1.5">
+                            <i class="fa-solid fa-location-dot text-amber-400"></i> จุดที่นำไปตัดแยกพลังงาน / เครื่องจักร
+                        </label>
+                        <input type="text" id="isolationPoint" placeholder="เช่น ตู้ MCC-1 / ปั๊มน้ำ P-102" required
+                            class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400">
+                    </div>
+
+                    <!-- LOTO Equipment Items (3 Categories) -->
+                    <div class="space-y-2">
+                        <label class="text-xs font-semibold text-zinc-300 flex items-center justify-between px-1">
+                            <span><i class="fa-solid fa-boxes-stacked text-amber-400 mr-1"></i> รายการอุปกรณ์ LOTO</span>
+                            <span class="text-[10px] text-zinc-400">*เลือกจำนวนอย่างน้อย 1 รายการ</span>
+                        </label>
+
+                        <!-- Item 1: Padlock & Hasp -->
+                        <div class="bg-zinc-800/80 p-3 rounded-xl border border-zinc-700/80 flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-lg bg-red-500/20 border border-red-500/40 text-red-400 flex items-center justify-center text-lg shrink-0">
+                                    <i class="fa-solid fa-padlock"></i>
+                                </div>
+                                <div>
+                                    <h3 class="text-sm font-semibold text-white">1. กุญแจและสายยู (Padlock & Hasp)</h3>
+                                    <p class="text-[11px] text-zinc-400">ชุดแม่กุญแจเซฟตี้ + หูช้างล็อกหลายจุด</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2 bg-zinc-900 px-2 py-1 rounded-lg border border-zinc-700">
+                                <button type="button" onclick="adjustQty('padlock', -1)" class="w-7 h-7 bg-zinc-800 rounded text-amber-400 hover:bg-zinc-700 font-bold active:scale-95 transition">-</button>
+                                <span id="qty-padlock" class="w-6 text-center text-sm font-bold text-white">0</span>
+                                <button type="button" onclick="adjustQty('padlock', 1)" class="w-7 h-7 bg-zinc-800 rounded text-amber-400 hover:bg-zinc-700 font-bold active:scale-95 transition">+</button>
+                            </div>
+                        </div>
+
+                        <!-- Item 2: Warning Tags -->
+                        <div class="bg-zinc-800/80 p-3 rounded-xl border border-zinc-700/80 flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center text-lg shrink-0">
+                                    <i class="fa-solid fa-tag"></i>
+                                </div>
+                                <div>
+                                    <h3 class="text-sm font-semibold text-white">2. ป้ายเตือนอันตราย (LOTO Tag)</h3>
+                                    <p class="text-[11px] text-zinc-400">ป้ายเตือนห้ามสับสวิตช์ / ป้ายอันตราย</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2 bg-zinc-900 px-2 py-1 rounded-lg border border-zinc-700">
+                                <button type="button" onclick="adjustQty('tag', -1)" class="w-7 h-7 bg-zinc-800 rounded text-amber-400 hover:bg-zinc-700 font-bold active:scale-95 transition">-</button>
+                                <span id="qty-tag" class="w-6 text-center text-sm font-bold text-white">0</span>
+                                <button type="button" onclick="adjustQty('tag', 1)" class="w-7 h-7 bg-zinc-800 rounded text-amber-400 hover:bg-zinc-700 font-bold active:scale-95 transition">+</button>
+                            </div>
+                        </div>
+
+                        <!-- Item 3: Valve & Breaker Lockout Device -->
+                        <div class="bg-zinc-800/80 p-3 rounded-xl border border-zinc-700/80 flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-lg bg-blue-500/20 border border-blue-500/40 text-blue-400 flex items-center justify-center text-lg shrink-0">
+                                    <i class="fa-solid fa-gears"></i>
+                                </div>
+                                <div>
+                                    <h3 class="text-sm font-semibold text-white">3. ตัวล็อกวาล์ว / เบรกเกอร์</h3>
+                                    <p class="text-[11px] text-zinc-400">อุปกรณ์ครอบวาล์ว / ล็อกสวิตช์ไฟ</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2 bg-zinc-900 px-2 py-1 rounded-lg border border-zinc-700">
+                                <button type="button" onclick="adjustQty('device', -1)" class="w-7 h-7 bg-zinc-800 rounded text-amber-400 hover:bg-zinc-700 font-bold active:scale-95 transition">-</button>
+                                <span id="qty-device" class="w-6 text-center text-sm font-bold text-white">0</span>
+                                <button type="button" onclick="adjustQty('device', 1)" class="w-7 h-7 bg-zinc-800 rounded text-amber-400 hover:bg-zinc-700 font-bold active:scale-95 transition">+</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <button type="submit" 
+                        class="w-full bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-zinc-950 font-bold py-3.5 px-4 rounded-xl shadow-lg shadow-amber-400/20 active:scale-[0.98] transition flex items-center justify-center gap-2 mt-4 text-base">
+                        <i class="fa-solid fa-clipboard-check"></i> ตรวจสอบและยืนยันการเบิก
+                    </button>
+                </form>
+            </section>
+
+            <!-- SECTION 2: RETURN FORM (รายการค้างคืน / คืนอุปกรณ์) -->
+            <section id="tab-return" class="space-y-4 hidden">
+                <div class="bg-blue-500/10 border-l-4 border-blue-500 p-3 rounded-r-lg flex items-center justify-between">
+                    <div>
+                        <h2 class="text-sm font-bold text-blue-400 flex items-center gap-1.5">
+                            <i class="fa-solid fa-rotate-left"></i> คืนอุปกรณ์ LOTO
+                        </h2>
+                        <p class="text-xs text-zinc-400">เลือกรายการที่ค้างอยู่เพื่อทำการคืน</p>
+                    </div>
+                    <span id="activeCountBadge" class="text-xs font-bold bg-blue-500 text-zinc-950 px-2 py-0.5 rounded-full">0 รายการ</span>
+                </div>
+
+                <!-- Active Checkouts List -->
+                <div id="activeCheckoutsList" class="space-y-3">
+                    <!-- Populated by JS -->
+                </div>
+            </section>
+
+            <!-- SECTION 3: HISTORY LOG (ประวัติการเบิก-คืน) -->
+            <section id="tab-history" class="space-y-4 hidden">
+                <div class="bg-zinc-800 p-3 rounded-xl flex items-center justify-between border border-zinc-700">
+                    <div>
+                        <h2 class="text-sm font-bold text-white flex items-center gap-1.5">
+                            <i class="fa-solid fa-clock-rotate-left text-amber-400"></i> ประวัติเบิก-คืน ทั้งหมด
+                        </h2>
+                        <p class="text-xs text-zinc-400">บันทึกการใช้งานอุปกรณ์ย้อนหลัง</p>
+                    </div>
+                    <button onclick="exportToCSV()" class="text-xs bg-zinc-700 hover:bg-zinc-600 px-2.5 py-1.5 rounded-lg text-amber-400 font-medium flex items-center gap-1 border border-zinc-600">
+                        <i class="fa-solid fa-file-csv"></i> CSV
+                    </button>
+                </div>
+
+                <div id="historyList" class="space-y-3">
+                    <!-- Populated by JS -->
+                </div>
+            </section>
+
+            <!-- SECTION 4: SETTINGS (ตั้งค่า Google Sheets) -->
+            <section id="tab-settings" class="space-y-4 hidden">
+                <div class="bg-zinc-800 p-4 rounded-xl border border-zinc-700 space-y-3">
+                    <h2 class="text-sm font-bold text-amber-400 flex items-center gap-2">
+                        <i class="fa-solid fa-file-excel"></i> การเชื่อมต่อ Google Sheets
+                    </h2>
+                    <p class="text-xs text-zinc-300 leading-relaxed">
+                        คุณสามารถบันทึกข้อมูลเบิก-คืนอุปกรณ์ไปยัง Google Sheets ของคุณได้โดยอัตโนมัติ โดยใส่ Webhook URL จาก Google Apps Script
+                    </p>
+
+                    <div class="space-y-1 pt-2">
+                        <label class="text-xs text-zinc-400 font-medium">Google Webhook URL</label>
+                        <input type="url" id="webhookUrl" placeholder="https://script.google.com/macros/s/.../exec"
+                            class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-amber-400">
+                    </div>
+
+                    <button onclick="saveWebhookSettings()" class="w-full bg-amber-400 text-zinc-950 font-bold py-2 rounded-lg text-xs hover:bg-amber-300 transition">
+                        บันทึก Webhook URL
+                    </button>
+                </div>
+
+                <!-- Google Apps Script Code Modal Trigger -->
+                <div class="bg-zinc-800/50 p-4 rounded-xl border border-zinc-700/60 space-y-2">
+                    <h3 class="text-xs font-bold text-white flex items-center gap-1.5">
+                        <i class="fa-solid fa-code text-amber-400"></i> โค้ดสำหรับ Google Apps Script
+                    </h3>
+                    <p class="text-[11px] text-zinc-400">คัดลอกโค้ดไปวางใน Extensions > Apps Script ใน Google Sheet</p>
+                    <button onclick="openScriptModal()" class="w-full border border-zinc-600 text-zinc-300 hover:text-white hover:bg-zinc-700 font-medium py-2 rounded-lg text-xs transition">
+                        <i class="fa-regular fa-copy mr-1"></i> ดูโค้ด Google Apps Script
+                    </button>
+                </div>
+            </section>
+
+        </main>
+
+        <!-- Bottom Tab Navigation Bar -->
+        <nav class="absolute bottom-0 left-0 right-0 bg-zinc-950 border-t border-zinc-800 grid grid-cols-3 gap-1 p-2 z-20">
+            <button onclick="switchTab('checkout')" id="nav-checkout" class="flex flex-col items-center justify-center py-1.5 rounded-xl text-amber-400 bg-zinc-900 border border-amber-400/20 font-medium transition">
+                <i class="fa-solid fa-plus-circle text-lg"></i>
+                <span class="text-[10px] mt-0.5">เบิกอุปกรณ์</span>
+            </button>
+            <button onclick="switchTab('return')" id="nav-return" class="flex flex-col items-center justify-center py-1.5 rounded-xl text-zinc-400 hover:text-white transition">
+                <i class="fa-solid fa-box-archive text-lg"></i>
+                <span class="text-[10px] mt-0.5">คืนอุปกรณ์</span>
+            </button>
+            <button onclick="switchTab('history')" id="nav-history" class="flex flex-col items-center justify-center py-1.5 rounded-xl text-zinc-400 hover:text-white transition">
+                <i class="fa-solid fa-list-check text-lg"></i>
+                <span class="text-[10px] mt-0.5">ประวัติ</span>
+            </button>
+        </nav>
+    </div>
+
+    <!-- MODAL 1: CHECKOUT REVIEW CONFIRMATION (ยืนยันรายการเบิก) -->
+    <div id="reviewModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-zinc-900 border border-amber-400/40 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl space-y-4 p-5 relative">
+            <div class="hazard-stripe-sm h-3 -mx-5 -mt-5 mb-4"></div>
+            
+            <div class="flex items-center gap-2 border-b border-zinc-800 pb-3">
+                <div class="w-8 h-8 rounded-lg bg-amber-400 text-zinc-950 flex items-center justify-center font-bold">
+                    <i class="fa-solid fa-clipboard-check"></i>
+                </div>
+                <div>
+                    <h3 class="text-base font-bold text-white">สรุปรายการยืนยันการเบิก</h3>
+                    <p class="text-xs text-zinc-400">ตรวจสอบความถูกต้องก่อนบันทึก</p>
+                </div>
+            </div>
+
+            <!-- Summary Details -->
+            <div id="reviewContent" class="space-y-3 text-xs text-zinc-300">
+                <!-- JS Inject -->
+            </div>
+
+            <div class="pt-2 grid grid-cols-2 gap-2">
+                <button onclick="closeModal('reviewModal')" class="py-2.5 rounded-xl bg-zinc-800 text-zinc-300 font-semibold hover:bg-zinc-700 transition">
+                    แก้ไขข้อมูล
+                </button>
+                <button onclick="confirmCheckoutSubmit()" class="py-2.5 rounded-xl bg-amber-400 text-zinc-950 font-bold hover:bg-amber-300 transition shadow-lg shadow-amber-400/20">
+                    ยืนยันเบิกอุปกรณ์
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 2: RETURN PROCESS MODAL (ยืนยันการคืน) -->
+    <div id="returnModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-zinc-900 border border-blue-500/40 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl space-y-4 p-5">
+            <div class="flex items-center gap-2 border-b border-zinc-800 pb-3">
+                <div class="w-8 h-8 rounded-lg bg-blue-500 text-zinc-950 flex items-center justify-center font-bold">
+                    <i class="fa-solid fa-boxes-packing"></i>
+                </div>
+                <div>
+                    <h3 class="text-base font-bold text-white">คืนอุปกรณ์ LOTO</h3>
+                    <p class="text-xs text-zinc-400">ตรวจสอบอุปกรณ์และระบุผู้คืน</p>
+                </div>
+            </div>
+
+            <form id="returnForm" onsubmit="confirmReturnSubmit(event)" class="space-y-3">
+                <input type="hidden" id="returnRecordId">
+                
+                <div id="returnItemsSummary" class="bg-zinc-800/80 p-3 rounded-xl border border-zinc-700 space-y-1 text-xs">
+                    <!-- Populated by JS -->
+                </div>
+
+                <div class="space-y-1">
+                    <label class="text-xs text-zinc-400 font-medium">วันที่และเวลาคืน</label>
+                    <input type="datetime-local" id="returnDateTime" required
+                        class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500">
+                </div>
+
+                <div class="space-y-1">
+                    <label class="text-xs text-zinc-400 font-medium">ชื่อ-นามสกุล ผู้คืนอุปกรณ์</label>
+                    <input type="text" id="returnerName" placeholder="ระบุชื่อผู้คืน" required
+                        class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500">
+                </div>
+
+                <div class="pt-2 grid grid-cols-2 gap-2">
+                    <button type="button" onclick="closeModal('returnModal')" class="py-2.5 rounded-xl bg-zinc-800 text-zinc-300 font-semibold hover:bg-zinc-700 transition">
+                        ยกเลิก
+                    </button>
+                    <button type="submit" class="py-2.5 rounded-xl bg-blue-500 text-zinc-950 font-bold hover:bg-blue-400 transition shadow-lg shadow-blue-500/20">
+                        ยืนยันการคืน
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 3: GOOGLE SCRIPT CODE DISPLAY -->
+    <div id="scriptModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-zinc-900 border border-zinc-700 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl p-5 space-y-3">
+            <h3 class="text-sm font-bold text-amber-400">Google Apps Script Code</h3>
+            <p class="text-xs text-zinc-400">นำโค้ดนี้ไปวางใน Google Apps Script เพื่อให้ Google Sheet รับข้อมูลอัตโนมัติ:</p>
+            
+            <textarea id="appsScriptCode" readonly class="w-full h-44 bg-zinc-950 border border-zinc-800 rounded-lg p-2.5 text-[10px] font-mono text-amber-300 focus:outline-none select-all">
+function doPost(e) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  var data = JSON.parse(e.postData.contents);
+  
+  if (data.action === "checkout") {
+    sheet.appendRow([
+      data.id,
+      data.checkoutDate,
+      data.borrowerName,
+      data.isolationPoint,
+      data.padlockQty,
+      data.tagQty,
+      data.deviceQty,
+      "กำลังใช้งาน (Active)",
+      "",
+      ""
+    ]);
+  } else if (data.action === "return") {
+    var rows = sheet.getDataRange().getValues();
+    for (var i = 1; i < rows.length; i++) {
+      if (rows[i][0] == data.id) {
+        sheet.getRange(i + 1, 8).setValue("คืนเรียบร้อย (Returned)");
+        sheet.getRange(i + 1, 9).setValue(data.returnDate);
+        sheet.getRange(i + 1, 10).setValue(data.returnerName);
+        break;
+      }
+    }
+  }
+  return ContentService.createTextOutput("Success");
+}</textarea>
+            
+            <div class="flex gap-2">
+                <button onclick="copyAppsScript()" class="flex-1 bg-amber-400 text-zinc-950 font-bold py-2 rounded-lg text-xs hover:bg-amber-300">
+                    <i class="fa-regular fa-copy"></i> คัดลอกโค้ด
+                </button>
+                <button onclick="closeModal('scriptModal')" class="bg-zinc-800 text-zinc-300 font-medium px-4 py-2 rounded-lg text-xs">
+                    ปิด
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="fixed top-4 left-1/2 -translate-x-1/2 bg-amber-400 text-zinc-950 px-4 py-2.5 rounded-full font-bold text-xs shadow-xl flex items-center gap-2 transition-all duration-300 -translate-y-20 opacity-0 z-50">
+        <i class="fa-solid fa-circle-check"></i>
+        <span id="toastMsg">บันทึกสำเร็จ</span>
+    </div>
+
+    <script>
+        // Default Mock State & Data Storage
+        let appData = {
+            records: JSON.parse(localStorage.getItem('loto_records') || '[]'),
+            quantities: { padlock: 0, tag: 0, device: 0 },
+            webhookUrl: localStorage.getItem('loto_webhook') || 'https://script.google.com/macros/s/AKfycbyD_I7TSD3HM7rHcYK6B3syzXhV2R4-BIiIwWAM4b12o8T0pCzLxnuVZ_NOh9YJ7gKq/exec'
+        };
+
+        // Initialize App
+        window.addEventListener('DOMContentLoaded', () => {
+            setCurrentDateTimeInput('checkoutDateTime');
+            updateLiveTime();
+            setInterval(updateLiveTime, 1000);
+            renderActiveCheckouts();
+            renderHistory();
+            
+            if (appData.webhookUrl) {
+                document.getElementById('webhookUrl').value = appData.webhookUrl;
+            }
+
+            // Demo data if empty
+            if (appData.records.length === 0) {
+                seedDemoData();
+            }
+        });
+
+        // Set Current Local ISO Datetime into input
+        function setCurrentDateTimeInput(id) {
+            const now = new Date();
+            now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+            document.getElementById(id).value = now.toISOString().slice(0, 16);
+        }
+
+        function updateLiveTime() {
+            const now = new Date();
+            document.getElementById('liveTimeDisplay').innerText = now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+        }
+
+        // Quantity Adjuster
+        function adjustQty(item, val) {
+            appData.quantities[item] = Math.max(0, appData.quantities[item] + val);
+            document.getElementById(`qty-${item}`).innerText = appData.quantities[item];
+        }
+
+        // Tab Switching Logic
+        function switchTab(tabName) {
+            ['checkout', 'return', 'history', 'settings'].forEach(t => {
+                const section = document.getElementById(`tab-${t}`);
+                const navBtn = document.getElementById(`nav-${t}`);
+                if (section) section.classList.add('hidden');
+                if (navBtn) {
+                    navBtn.className = "flex flex-col items-center justify-center py-1.5 rounded-xl text-zinc-400 hover:text-white transition";
+                }
+            });
+
+            const activeSection = document.getElementById(`tab-${tabName}`);
+            const activeNav = document.getElementById(`nav-${tabName}`);
+            if (activeSection) activeSection.classList.remove('hidden');
+            if (activeNav) {
+                activeNav.className = "flex flex-col items-center justify-center py-1.5 rounded-xl text-amber-400 bg-zinc-900 border border-amber-400/20 font-medium transition";
+            }
+
+            if (tabName === 'return') renderActiveCheckouts();
+            if (tabName === 'history') renderHistory();
+        }
+
+        // Form Submit Review Trigger
+        function handleFormReview(e) {
+            e.preventDefault();
+
+            const padlock = appData.quantities.padlock;
+            const tag = appData.quantities.tag;
+            const device = appData.quantities.device;
+
+            if (padlock === 0 && tag === 0 && device === 0) {
+                showToast("⚠️ กรุณาเลือกอุปกรณ์อย่างน้อย 1 รายการ", "bg-red-500 text-white");
+                return;
+            }
+
+            const borrower = document.getElementById('borrowerName').value;
+            const location = document.getElementById('isolationPoint').value;
+            const dateVal = document.getElementById('checkoutDateTime').value;
+            const formattedDate = new Date(dateVal).toLocaleString('th-TH');
+
+            const reviewHtml = `
+                <div class="bg-zinc-950 p-2.5 rounded-lg border border-zinc-800 space-y-1.5">
+                    <div><span class="text-zinc-500">วันที่เบิก:</span> <strong class="text-white">${formattedDate}</strong></div>
+                    <div><span class="text-zinc-500">ผู้เบิก:</span> <strong class="text-amber-400">${borrower}</strong></div>
+                    <div><span class="text-zinc-500">จุดตัดแยกพลังงาน:</span> <strong class="text-white">${location}</strong></div>
+                </div>
+                <div class="bg-zinc-800/80 p-2.5 rounded-lg border border-zinc-700/60">
+                    <p class="font-bold text-amber-400 mb-1">รายการอุปกรณ์ที่เบิก:</p>
+                    <ul class="space-y-1">
+                        ${padlock > 0 ? `<li class="flex justify-between"><span>• แม่กุญแจและสายยู</span> <span class="font-bold text-white">${padlock} ชุด</span></li>` : ''}
+                        ${tag > 0 ? `<li class="flex justify-between"><span>• ป้ายเตือนอันตราย</span> <span class="font-bold text-white">${tag} ใบ</span></li>` : ''}
+                        ${device > 0 ? `<li class="flex justify-between"><span>• ตัวล็อกวาล์ว/เบรกเกอร์</span> <span class="font-bold text-white">${device} ตัว</span></li>` : ''}
+                    </ul>
+                </div>
+            `;
+
+            document.getElementById('reviewContent').innerHTML = reviewHtml;
+            openModal('reviewModal');
+        }
+
+        // Confirm Checkout Submission
+        function confirmCheckoutSubmit() {
+            closeModal('reviewModal');
+
+            const newRecord = {
+                id: 'LOTO-' + Date.now().toString().slice(-6),
+                checkoutDate: document.getElementById('checkoutDateTime').value,
+                borrowerName: document.getElementById('borrowerName').value,
+                isolationPoint: document.getElementById('isolationPoint').value,
+                padlockQty: appData.quantities.padlock,
+                tagQty: appData.quantities.tag,
+                deviceQty: appData.quantities.device,
+                status: 'ACTIVE', // ACTIVE or RETURNED
+                returnDate: '',
+                returnerName: ''
+            };
+
+            appData.records.unshift(newRecord);
+            saveRecords();
+
+            // Reset Form & Quantities
+            document.getElementById('checkoutForm').reset();
+            setCurrentDateTimeInput('checkoutDateTime');
+            appData.quantities = { padlock: 0, tag: 0, device: 0 };
+            document.getElementById('qty-padlock').innerText = '0';
+            document.getElementById('qty-tag').innerText = '0';
+            document.getElementById('qty-device').innerText = '0';
+
+            // Send to Google Sheet if configured
+            syncToGoogleSheets({ action: 'checkout', ...newRecord });
+
+            showToast("✅ บันทึกการเบิกอุปกรณ์เรียบร้อยแล้ว");
+            switchTab('return');
+        }
+
+        // Render Pending Returns List
+        function renderActiveCheckouts() {
+            const activeList = appData.records.filter(r => r.status === 'ACTIVE');
+            const container = document.getElementById('activeCheckoutsList');
+            document.getElementById('activeCountBadge').innerText = `${activeList.length} รายการ`;
+
+            if (activeList.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-10 text-zinc-500 bg-zinc-800/30 rounded-2xl border border-zinc-800">
+                        <i class="fa-solid fa-check-circle text-3xl mb-2 text-zinc-600"></i>
+                        <p class="text-xs">ไม่มีอุปกรณ์ค้างคืนในขณะนี้</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = activeList.map(item => `
+                <div class="bg-zinc-800/90 border border-zinc-700/80 rounded-xl p-3.5 space-y-2 relative overflow-hidden">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <span class="text-[10px] font-mono text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/20">${item.id}</span>
+                            <h3 class="text-sm font-bold text-white mt-1">${item.isolationPoint}</h3>
+                        </div>
+                        <span class="text-[10px] bg-red-500/20 text-red-400 border border-red-500/30 px-2 py-0.5 rounded-full font-medium">
+                            กำลังใช้งาน
+                        </span>
+                    </div>
+
+                    <div class="text-xs text-zinc-400 space-y-0.5">
+                        <p><i class="fa-solid fa-user text-zinc-500 mr-1"></i> ผู้เบิก: <span class="text-zinc-200 font-medium">${item.borrowerName}</span></p>
+                        <p><i class="fa-solid fa-clock text-zinc-500 mr-1"></i> วันที่เบิก: ${new Date(item.checkoutDate).toLocaleString('th-TH')}</p>
+                    </div>
+
+                    <div class="bg-zinc-900 p-2 rounded-lg border border-zinc-800 text-xs flex gap-3 text-zinc-300">
+                        ${item.padlockQty > 0 ? `<span>🔐 กุญแจ: <strong>${item.padlockQty}</strong></span>` : ''}
+                        ${item.tagQty > 0 ? `<span>🏷️ ป้าย: <strong>${item.tagQty}</strong></span>` : ''}
+                        ${item.deviceQty > 0 ? `<span>⚙️ ตัวล็อก: <strong>${item.deviceQty}</strong></span>` : ''}
+                    </div>
+
+                    <button onclick="openReturnModal('${item.id}')" 
+                        class="w-full bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30 py-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 mt-2">
+                        <i class="fa-solid fa-rotate-left"></i> ดำเนินการคืนอุปกรณ์
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        // Open Return Modal
+        function openReturnModal(id) {
+            const record = appData.records.find(r => r.id === id);
+            if (!record) return;
+
+            document.getElementById('returnRecordId').value = record.id;
+            setCurrentDateTimeInput('returnDateTime');
+            
+            document.getElementById('returnItemsSummary').innerHTML = `
+                <div class="text-amber-400 font-bold mb-1">ตรวจสอบรายการที่จะคืน (${record.id}):</div>
+                <div class="text-zinc-300">จุดตัดแยก: <strong>${record.isolationPoint}</strong></div>
+                <div class="text-zinc-300">ผู้เบิกเดิม: <strong>${record.borrowerName}</strong></div>
+                <div class="mt-2 pt-2 border-t border-zinc-700/60 font-medium text-white space-y-0.5">
+                    ${record.padlockQty > 0 ? `<div>• กุญแจและสายยู: ${record.padlockQty} ชุด</div>` : ''}
+                    ${record.tagQty > 0 ? `<div>• ป้ายเตือน: ${record.tagQty} ใบ</div>` : ''}
+                    ${record.deviceQty > 0 ? `<div>• ตัวล็อกวาล์ว/เบรกเกอร์: ${record.deviceQty} ตัว</div>` : ''}
+                </div>
+            `;
+
+            openModal('returnModal');
+        }
+
+        // Confirm Return Submit
+        function confirmReturnSubmit(e) {
+            e.preventDefault();
+            const id = document.getElementById('returnRecordId').value;
+            const record = appData.records.find(r => r.id === id);
+
+            if (record) {
+                record.status = 'RETURNED';
+                record.returnDate = document.getElementById('returnDateTime').value;
+                record.returnerName = document.getElementById('returnerName').value;
+
+                saveRecords();
+                syncToGoogleSheets({ action: 'return', ...record });
+
+                closeModal('returnModal');
+                showToast("✅ บันทึกการคืนอุปกรณ์สำเร็จ");
+                renderActiveCheckouts();
+            }
+        }
+
+        // Render Transaction History
+        function renderHistory() {
+            const container = document.getElementById('historyList');
+
+            if (appData.records.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-10 text-zinc-500 bg-zinc-800/30 rounded-2xl border border-zinc-800">
+                        <p class="text-xs">ยังไม่มีประวัติการทำรายการ</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = appData.records.map(item => {
+                const isReturned = item.status === 'RETURNED';
+                return `
+                    <div class="bg-zinc-800/60 border border-zinc-700/60 rounded-xl p-3 space-y-1.5 text-xs">
+                        <div class="flex justify-between items-center">
+                            <span class="font-mono text-amber-400 font-bold">${item.id}</span>
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${isReturned ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'}">
+                                ${isReturned ? 'คืนเรียบร้อย' : 'กำลังใช้งาน'}
+                            </span>
+                        </div>
+                        
+                        <div class="font-bold text-white text-sm">${item.isolationPoint}</div>
+                        
+                        <div class="text-zinc-400 space-y-0.5">
+                            <div>เบิก: ${item.borrowerName} (${new Date(item.checkoutDate).toLocaleDateString('th-TH')})</div>
+                            ${isReturned ? `<div class="text-emerald-400/90">คืน: ${item.returnerName} (${new Date(item.returnDate).toLocaleDateString('th-TH')})</div>` : ''}
+                        </div>
+
+                        <div class="text-[11px] text-zinc-400 bg-zinc-900/60 p-1.5 rounded border border-zinc-800 flex gap-2">
+                            <span>🔐 ${item.padlockQty}</span>
+                            <span>🏷️ ${item.tagQty}</span>
+                            <span>⚙️ ${item.deviceQty}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Save Webhook Settings
+        function saveWebhookSettings() {
+            const url = document.getElementById('webhookUrl').value.trim();
+            appData.webhookUrl = url;
+            localStorage.setItem('loto_webhook', url);
+            showToast("💾 บันทึก Webhook URL เรียบร้อย");
+        }
+
+        // Send Data to Google Sheets Webhook
+        function syncToGoogleSheets(payload) {
+            if (!appData.webhookUrl) return;
+
+            fetch(appData.webhookUrl, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }).catch(err => console.log('Sheet Sync Error:', err));
+        }
+
+        // Export Data to CSV File
+        function exportToCSV() {
+            if (appData.records.length === 0) {
+                showToast("ไม่มีข้อมูลสำหรับส่งออก", "bg-red-500 text-white");
+                return;
+            }
+
+            let csv = "\uFEFFรหัส,วันที่เบิก,ผู้เบิก,จุดตัดแยกพลังงาน,กุญแจ,ป้ายเตือน,อุปกรณ์ล็อก,สถานะ,วันที่คืน,ผู้คืน\n";
+            appData.records.forEach(r => {
+                csv += `"${r.id}","${r.checkoutDate}","${r.borrowerName}","${r.isolationPoint}",${r.padlockQty},${r.tagQty},${r.deviceQty},"${r.status}","${r.returnDate || ''}","${r.returnerName || ''}"\n`;
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `LOTO_Log_${new Date().toISOString().slice(0,10)}.csv`;
+            a.click();
+        }
+
+        // Utility Helpers
+        function saveRecords() {
+            localStorage.setItem('loto_records', JSON.stringify(appData.records));
+        }
+
+        function showToast(msg, bgClass = "bg-amber-400 text-zinc-950") {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toastMsg');
+            toast.className = `fixed top-4 left-1/2 -translate-x-1/2 px-4 py-2.5 rounded-full font-bold text-xs shadow-xl flex items-center gap-2 transition-all duration-300 z-50 ${bgClass}`;
+            toastMsg.innerText = msg;
+            toast.classList.remove('-translate-y-20', 'opacity-0');
+            setTimeout(() => {
+                toast.classList.add('-translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+
+        function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
+        function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+        function openScriptModal() { openModal('scriptModal'); }
+
+        function copyAppsScript() {
+            const code = document.getElementById('appsScriptCode');
+            code.select();
+            document.execCommand('copy');
+            showToast("📋 คัดลอกโค้ดลง Clipboard แล้ว");
+        }
+
+        // Demo Initial Seed Data
+        function seedDemoData() {
+            appData.records = [
+                {
+                    id: 'LOTO-882101',
+                    checkoutDate: new Date(Date.now() - 3600000 * 4).toISOString().slice(0, 16),
+                    borrowerName: 'สมชาย ช่างกล',
+                    isolationPoint: 'ตู้ควบคุมไฟ MCC-2 (ปั๊ม P-201)',
+                    padlockQty: 2,
+                    tagQty: 2,
+                    deviceQty: 1,
+                    status: 'ACTIVE',
+                    returnDate: '',
+                    returnerName: ''
+                },
+                {
+                    id: 'LOTO-882098',
+                    checkoutDate: new Date(Date.now() - 3600000 * 24).toISOString().slice(0, 16),
+                    borrowerName: 'วิชัย เซฟตี้',
+                    isolationPoint: 'วาล์วท่อไอน้ำ Main Steam Line A',
+                    padlockQty: 1,
+                    tagQty: 1,
+                    deviceQty: 1,
+                    status: 'RETURNED',
+                    returnDate: new Date(Date.now() - 3600000 * 20).toISOString().slice(0, 16),
+                    returnerName: 'วิชัย เซฟตี้'
+                }
+            ];
+            saveRecords();
+        }
+    </script>
+</body>
+</html>
